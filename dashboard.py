@@ -262,8 +262,19 @@ def load_model():
 rfm = load_data()
 model = load_model()
 
-rfm['churn_risk'] = model.predict(rfm[['frequency', 'monetary']])
-rfm['churn_probability'] = model.predict_proba(rfm[['frequency', 'monetary']])[:, 1]
+@st.cache_data
+def compute_predictions(_model, df):
+    df = df.copy()
+    df['avg_order_value'] = df['monetary'] / df['frequency']
+    df['is_one_time'] = (df['frequency'] == 1).astype(int)
+    df['high_spender'] = (df['monetary'] > df['monetary'].quantile(0.75)).astype(int)
+    df['rfm_score_norm'] = df['rfm_score'] / 12
+    features = ['frequency', 'monetary', 'avg_order_value', 'is_one_time', 'high_spender', 'rfm_score_norm']
+    df['churn_risk'] = _model.predict(df[features])
+    df['churn_probability'] = _model.predict_proba(df[features])[:, 1]
+    return df
+
+rfm = compute_predictions(model, rfm)
 
 SEGMENT_COLORS = {
     'Şampiyonlar':       '#10b981',
@@ -275,13 +286,12 @@ SEGMENT_COLORS = {
 PLOTLY_THEME = dict(
     paper_bgcolor='rgba(0,0,0,0)',
     plot_bgcolor='rgba(0,0,0,0)',
-    font=dict(family='Space Grotesk', color='#94a3b8', size=12),
-    xaxis=dict(gridcolor='#1e2035', linecolor='#1e2035', tickfont=dict(color='#94a3b8')),
-    yaxis=dict(gridcolor='#1e2035', linecolor='#1e2035', tickfont=dict(color='#94a3b8')),
+    font=dict(family='Space Grotesk', color='#f1f5f9', size=12),
+    xaxis=dict(gridcolor='#1e2035', linecolor='#1e2035', tickfont=dict(color='#cbd5e1')),
+    yaxis=dict(gridcolor='#1e2035', linecolor='#1e2035', tickfont=dict(color='#cbd5e1')),
+    legend=dict(bgcolor='rgba(0,0,0,0)', font=dict(color='#f1f5f9', size=12)),
     margin=dict(l=10, r=10, t=30, b=10)
 )
-
-LEGEND_STYLE = dict(bgcolor='rgba(0,0,0,0)', font=dict(color='#94a3b8'))
 
 # ── SIDEBAR ──
 with st.sidebar:
@@ -364,9 +374,9 @@ if page == "📊 Genel Bakış":
                      color='segment', color_discrete_map=SEGMENT_COLORS, hole=0.55)
         fig.update_traces(textfont_size=13, textfont_color='white',
                           marker=dict(line=dict(color='#0a0a0f', width=2)))
-        fig.update_layout(**PLOTLY_THEME, height=320,
-                          legend=dict(orientation='h', y=-0.1, x=0.5, xanchor='center',
-                                      bgcolor='rgba(0,0,0,0)', font=dict(color='#94a3b8')))
+        fig.update_layout(**PLOTLY_THEME, height=320)
+        fig.update_layout(legend=dict(orientation='h', y=-0.1, x=0.5, xanchor='center',
+                                      bgcolor='rgba(0,0,0,0)', font=dict(color='#f1f5f9')))
         st.plotly_chart(fig, use_container_width=True)
 
     with col2:
@@ -591,43 +601,114 @@ elif page == "📈 Trend Analizi":
 elif page == "🔮 Churn Tahmini":
     st.markdown("### Churn Tahmin Modeli")
 
+    # Özet KPI'lar
+    c1, c2, c3 = st.columns(3)
+    churn_n = int(rfm['churn_risk'].sum())
+    safe_n = len(rfm) - churn_n
+    avg_risk = rfm['churn_probability'].mean()
+    with c1:
+        st.markdown(f"""<div class='kpi-card'>
+            <div class='kpi-label'>⚠️ Churn Riski Taşıyan</div>
+            <div class='kpi-value' style='color:#ef4444;'>{churn_n:,}</div>
+            <div class='kpi-delta-negative'>%{churn_n/len(rfm)*100:.1f} oran</div>
+        </div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""<div class='kpi-card'>
+            <div class='kpi-label'>✅ Aktif Müşteri</div>
+            <div class='kpi-value' style='color:#10b981;'>{safe_n:,}</div>
+            <div class='kpi-delta-positive'>%{safe_n/len(rfm)*100:.1f} oran</div>
+        </div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""<div class='kpi-card'>
+            <div class='kpi-label'>📊 Ortalama Churn Riski</div>
+            <div class='kpi-value' style='color:#f59e0b;'>%{avg_risk*100:.1f}</div>
+            <div class='kpi-delta-negative'>Tüm müşteriler</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
     col1, col2 = st.columns([1, 1])
 
     with col1:
-        st.markdown("<div class='section-title'>Tek Müşteri Tahmini</div>", unsafe_allow_html=True)
-        frequency = st.slider("Alışveriş Sıklığı", 1, 200, 10)
-        monetary = st.slider("Toplam Harcama ($)", 1, 3000, 150)
+        st.markdown("<div class='section-title'>🔍 Müşteri ID ile Churn Sorgula</div>", unsafe_allow_html=True)
+        st.markdown("<p style='color:#94a3b8; font-size:0.85rem; margin-bottom:1rem;'>Gerçek müşteri verisine dayalı tahmin yapar.</p>", unsafe_allow_html=True)
+
+        user_id_input = st.number_input(
+            "Müşteri ID",
+            min_value=int(rfm['user_id'].min()),
+            max_value=int(rfm['user_id'].max()),
+            value=int(rfm['user_id'].iloc[0])
+        )
 
         if st.button("🔮 Churn Riskini Hesapla"):
-            inp = pd.DataFrame([[frequency, monetary]], columns=['frequency', 'monetary'])
-            pred = model.predict(inp)[0]
-            prob = model.predict_proba(inp)[0][1]
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            if pred == 1:
-                st.markdown(f"""<div style='background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);
-                border-radius:10px; padding:1.2rem;'>
-                <div style='color:#ef4444; font-size:1.2rem; font-weight:700;'>⚠️ YÜKSEK CHURN RİSKİ</div>
-                <div style='color:#94a3b8; margin-top:0.5rem;'>Kayıp olasılığı: <span style='color:#ef4444; font-family:JetBrains Mono; font-weight:700;'>%{prob*100:.1f}</span></div>
-                <div style='color:#94a3b8; margin-top:0.8rem; font-size:0.85rem;'>👉 Öneri: Hemen %25 indirim kuponu gönder!</div>
-                </div>""", unsafe_allow_html=True)
+            result = rfm[rfm['user_id'] == user_id_input]
+            if len(result) == 0:
+                st.error("Müşteri bulunamadı.")
             else:
-                st.markdown(f"""<div style='background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);
-                border-radius:10px; padding:1.2rem;'>
-                <div style='color:#10b981; font-size:1.2rem; font-weight:700;'>✅ DÜŞÜK CHURN RİSKİ</div>
-                <div style='color:#94a3b8; margin-top:0.5rem;'>Aktif kalma olasılığı: <span style='color:#10b981; font-family:JetBrains Mono; font-weight:700;'>%{(1-prob)*100:.1f}</span></div>
-                <div style='color:#94a3b8; margin-top:0.8rem; font-size:0.85rem;'>👉 Öneri: Sadakat programına dahil et!</div>
-                </div>""", unsafe_allow_html=True)
+                r = result.iloc[0]
+                prob = r['churn_probability']
+                pred = r['churn_risk']
+
+                # Müşteri bilgileri
+                st.markdown(f"""
+                <div style='background:#16161f; border:1px solid #1e2035; border-radius:10px; padding:1rem; margin:1rem 0;'>
+                    <div style='display:grid; grid-template-columns:1fr 1fr; gap:0.8rem;'>
+                        <div><span style='color:#475569; font-size:0.75rem; text-transform:uppercase;'>Segment</span>
+                        <div style='color:#f1f5f9; font-weight:600; margin-top:0.2rem;'>{r['segment']}</div></div>
+                        <div><span style='color:#475569; font-size:0.75rem; text-transform:uppercase;'>RFM Skoru</span>
+                        <div style='color:#00d4ff; font-family:JetBrains Mono; font-weight:700; margin-top:0.2rem;'>{int(r['rfm_score'])}/12</div></div>
+                        <div><span style='color:#475569; font-size:0.75rem; text-transform:uppercase;'>Alışveriş Sıklığı</span>
+                        <div style='color:#f1f5f9; font-weight:600; margin-top:0.2rem;'>{int(r['frequency'])}x</div></div>
+                        <div><span style='color:#475569; font-size:0.75rem; text-transform:uppercase;'>Toplam Harcama</span>
+                        <div style='color:#f1f5f9; font-weight:600; margin-top:0.2rem;'>${r['monetary']:.1f}</div></div>
+                        <div><span style='color:#475569; font-size:0.75rem; text-transform:uppercase;'>Recency</span>
+                        <div style='color:#f1f5f9; font-weight:600; margin-top:0.2rem;'>{int(r['recency'])} gün önce</div></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                if pred == 1:
+                    st.markdown(f"""<div style='background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.4);
+                    border-radius:10px; padding:1.4rem;'>
+                    <div style='color:#ff6b6b; font-size:1.2rem; font-weight:700;'>⚠️ YÜKSEK CHURN RİSKİ</div>
+                    <div style='color:#e2e8f0; margin-top:0.6rem;'>Kayıp olasılığı:
+                    <span style='color:#ff6b6b; font-family:JetBrains Mono; font-weight:700; font-size:1.1rem;'> %{prob*100:.1f}</span></div>
+                    <div style='color:#cbd5e1; margin-top:0.8rem; font-size:0.85rem;'>👉 Hemen %25 indirim kuponu gönder!</div>
+                    </div>""", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""<div style='background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.4);
+                    border-radius:10px; padding:1.4rem;'>
+                    <div style='color:#34d399; font-size:1.2rem; font-weight:700;'>✅ DÜŞÜK CHURN RİSKİ</div>
+                    <div style='color:#e2e8f0; margin-top:0.6rem;'>Aktif kalma olasılığı:
+                    <span style='color:#34d399; font-family:JetBrains Mono; font-weight:700; font-size:1.1rem;'> %{(1-prob)*100:.1f}</span></div>
+                    <div style='color:#cbd5e1; margin-top:0.8rem; font-size:0.85rem;'>👉 Sadakat programına dahil et!</div>
+                    </div>""", unsafe_allow_html=True)
 
     with col2:
         st.markdown("<div class='section-title'>Churn Olasılığı Dağılımı</div>", unsafe_allow_html=True)
         fig = px.histogram(rfm, x='churn_probability', nbins=50,
                            color_discrete_sequence=['#7c3aed'])
-        fig.add_vline(x=0.5, line_dash="dash", line_color="#ef4444", 
-                      annotation_text="Risk Eşiği", annotation_font_color="#ef4444")
-        fig.update_layout(**PLOTLY_THEME, height=300,
+        fig.add_vline(x=0.5, line_dash="dash", line_color="#ef4444",
+                      annotation_text="Risk Eşiği", annotation_font_color="#f87171")
+        fig.update_layout(**PLOTLY_THEME, height=320,
                           xaxis_title="Churn Olasılığı", yaxis_title="Müşteri Sayısı")
         st.plotly_chart(fig, use_container_width=True)
+
+        # Segment bazlı churn dağılımı
+        churn_seg = rfm.groupby('segment').agg(
+            churn_oran=('churn_risk','mean'),
+            toplam=('user_id','count')
+        ).reset_index()
+        churn_seg['churn_pct'] = (churn_seg['churn_oran']*100).round(1)
+        fig2 = px.bar(churn_seg, x='segment', y='churn_pct',
+                      color='segment', color_discrete_map=SEGMENT_COLORS,
+                      labels={'churn_pct':'Churn Oranı (%)', 'segment':''}, text='churn_pct')
+        fig2.update_traces(texttemplate='%{text}%', textposition='outside',
+                           textfont=dict(color='#f1f5f9'))
+        fig2.update_layout(**PLOTLY_THEME, height=280, showlegend=False)
+        st.plotly_chart(fig2, use_container_width=True)
+
+    st.divider()
 
     # Toplu risk tablosu
     st.markdown("<div class='section-title'>⚡ En Yüksek Riskli 20 Müşteri</div>", unsafe_allow_html=True)
@@ -681,6 +762,12 @@ elif page == "🎯 Kampanya Simülatörü":
                 ("💸 Kampanya Maliyeti", f"${cost:,.0f}"),
                 ("📈 Tahmini ROI", f"%{roi:.0f}"),
             ]
+            if roi > 300:
+                st.markdown("""<div style='background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);
+                border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.8rem; font-size:0.82rem; color:#f59e0b;'>
+                ⚠️ <strong>Not:</strong> Bu tahmini bir ROI'dir. Operasyonel giderler ve sabit maliyetler
+                dahil değildir — gerçek ROI daha düşük olacaktır.
+                </div>""", unsafe_allow_html=True)
             for label, val in metrics:
                 st.markdown(f"""<div class='kpi-card' style='margin-bottom:0.6rem; padding:0.9rem;'>
                 <div style='display:flex; justify-content:space-between; align-items:center;'>

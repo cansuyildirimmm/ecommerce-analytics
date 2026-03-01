@@ -6,9 +6,14 @@ from sklearn.metrics import classification_report, accuracy_score
 import joblib
 
 def prepare_features(rfm):
-    """Model için feature'ları hazırla"""
-    # Churn etiketi: recency > 30 gün ise churn (1), değilse aktif (0)
-    rfm['churn'] = (rfm['recency'] > 30).astype(int)
+    # Churn etiketi: 60 günden uzun süredir alışveriş yapmamış
+    rfm['churn'] = (rfm['recency'] > 60).astype(int)
+    
+    # Ek feature'lar türet
+    rfm['avg_order_value'] = rfm['monetary'] / rfm['frequency']
+    rfm['is_one_time'] = (rfm['frequency'] == 1).astype(int)
+    rfm['high_spender'] = (rfm['monetary'] > rfm['monetary'].quantile(0.75)).astype(int)
+    rfm['rfm_score_norm'] = rfm['rfm_score'] / 12  # 0-1 arası normalize
     
     print(f"Aktif müşteri (churn=0): {(rfm['churn']==0).sum():,}")
     print(f"Churn müşteri (churn=1): {(rfm['churn']==1).sum():,}")
@@ -19,7 +24,7 @@ def prepare_features(rfm):
 def train_model(rfm):
     """Churn tahmin modelini eğit"""
     # Feature ve hedef değişkeni ayır
-    features = ['frequency', 'monetary']
+    features = ['frequency', 'monetary', 'avg_order_value', 'is_one_time', 'high_spender', 'rfm_score_norm']
     X = rfm[features]
     y = rfm['churn']
     
