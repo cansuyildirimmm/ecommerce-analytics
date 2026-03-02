@@ -310,7 +310,8 @@ with st.sidebar:
         "🔮 Churn Tahmini",
         "🎯 Kampanya Simülatörü",
         "🔍 Müşteri Sorgulama",
-        "🔄 Cohort Analizi"
+        "🔄 Cohort Analizi",
+        "💰 CLV Analizi"
     ], label_visibility="collapsed")
 
     st.divider()
@@ -987,8 +988,140 @@ elif page == "🔄 Cohort Analizi":
         Bu oran sadık müşteri tabanını temsil ediyor.
         </div>""", unsafe_allow_html=True)
 
+# ══════════════════════════════════════════
+# SAYFA 8: CLV ANALİZİ
+# ══════════════════════════════════════════
+elif page == "💰 CLV Analizi":
+    st.markdown("### Customer Lifetime Value Analizi")
+    st.markdown("<div style='color:#94a3b8; margin-bottom:1.5rem;'>Müşterilerin tahmini yaşam boyu değeri — önümüzdeki aylarda ne kadar gelir getireceklerini gösterir.</div>", unsafe_allow_html=True)
 
+    @st.cache_data
+    def load_clv():
+        return pd.read_csv('data/clv_data.csv')
 
+    clv = load_clv()
+
+    # KPI kartları
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown(f"""<div class='kpi-card'>
+            <div class='kpi-label'>💰 Toplam CLV</div>
+            <div class='kpi-value' style='color:#00d4ff; font-size:1.5rem;'>${clv['predicted_clv'].sum():,.0f}</div>
+            <div class='kpi-delta-positive'>Tüm müşteriler</div>
+        </div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""<div class='kpi-card'>
+            <div class='kpi-label'>📊 Ortalama CLV</div>
+            <div class='kpi-value' style='color:#7c3aed; font-size:1.5rem;'>${clv['predicted_clv'].mean():,.0f}</div>
+            <div class='kpi-delta-positive'>Müşteri başına</div>
+        </div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""<div class='kpi-card'>
+            <div class='kpi-label'>🏆 Medyan CLV</div>
+            <div class='kpi-value' style='color:#10b981; font-size:1.5rem;'>${clv['predicted_clv'].median():,.0f}</div>
+            <div class='kpi-delta-positive'>Tipik müşteri</div>
+        </div>""", unsafe_allow_html=True)
+    with c4:
+        top10_pct = clv.nlargest(int(len(clv)*0.1), 'predicted_clv')['predicted_clv'].sum() / clv['predicted_clv'].sum() * 100
+        st.markdown(f"""<div class='kpi-card'>
+            <div class='kpi-label'>⭐ Top %10 Katkısı</div>
+            <div class='kpi-value' style='color:#f59e0b; font-size:1.5rem;'>%{top10_pct:.0f}</div>
+            <div class='kpi-delta-positive'>Toplam gelirden</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("<div class='section-title'>📊 CLV Dağılımı</div>", unsafe_allow_html=True)
+        clv_filtered = clv[clv['predicted_clv'] < clv['predicted_clv'].quantile(0.95)]
+        fig = px.histogram(clv_filtered, x='predicted_clv', nbins=50,
+                           color_discrete_sequence=['#7c3aed'])
+        fig.add_vline(x=clv['predicted_clv'].mean(), line_dash="dash",
+                      line_color="#00d4ff", annotation_text="Ortalama",
+                      annotation_font_color="#00d4ff")
+        fig.update_layout(**PLOTLY_THEME, height=300,
+                          xaxis_title="Tahmini CLV ($)", yaxis_title="Müşteri Sayısı")
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        st.markdown("<div class='section-title'>🏷️ Segment Bazlı Ortalama CLV</div>", unsafe_allow_html=True)
+        seg_clv = clv.groupby('segment')['predicted_clv'].mean().reset_index()
+        seg_clv.columns = ['segment', 'avg_clv']
+        seg_clv = seg_clv.sort_values('avg_clv', ascending=False)
+        fig2 = px.bar(seg_clv, x='segment', y='avg_clv',
+                      color='segment', color_discrete_map=SEGMENT_COLORS,
+                      labels={'avg_clv': 'Ortalama CLV ($)', 'segment': ''},
+                      text='avg_clv')
+        fig2.update_traces(texttemplate='$%{text:.0f}', textposition='outside',
+                           textfont=dict(color='#f1f5f9'))
+        fig2.update_layout(**PLOTLY_THEME, height=300, showlegend=False)
+        st.plotly_chart(fig2, use_container_width=True)
+
+    # Segment bazlı toplam CLV pasta grafik
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("<div class='section-title'>🥧 Segment CLV Payı</div>", unsafe_allow_html=True)
+        seg_total = clv.groupby('segment')['predicted_clv'].sum().reset_index()
+        fig3 = px.pie(seg_total, values='predicted_clv', names='segment',
+                      color='segment', color_discrete_map=SEGMENT_COLORS,
+                      hole=0.55)
+        fig3.update_layout(**PLOTLY_THEME, height=300)
+        fig3.update_layout(legend=dict(orientation='h', y=-0.1, x=0.5, xanchor='center',
+                                       bgcolor='rgba(0,0,0,0)', font=dict(color='#f1f5f9')))
+        st.plotly_chart(fig3, use_container_width=True)
+
+    with col2:
+        st.markdown("<div class='section-title'>🔝 En Değerli 10 Müşteri</div>", unsafe_allow_html=True)
+        top10 = clv.nlargest(10, 'predicted_clv')[
+            ['user_id', 'segment', 'monetary', 'frequency', 'predicted_clv']
+        ].copy()
+        top10['predicted_clv'] = top10['predicted_clv'].round(1).astype(str) + '$'
+        top10['monetary'] = top10['monetary'].round(1).astype(str) + '$'
+        top10.columns = ['ID', 'Segment', 'Toplam Harcama', 'Sıklık', 'Tahmini CLV']
+        st.dataframe(top10, use_container_width=True, hide_index=True)
+
+    # CLV vs Churn scatter
+    st.markdown("<div class='section-title'>🎯 CLV & Churn Riski Matrisi</div>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#94a3b8; font-size:0.85rem; margin-bottom:1rem;'>Sağ üst köşe = yüksek değerli ama riskli müşteriler → Öncelikli aksiyon grubu!</p>", unsafe_allow_html=True)
+
+    clv_churn = clv.merge(rfm[['user_id', 'churn_probability']], on='user_id', how='left')
+    sample = clv_churn.sample(min(2000, len(clv_churn)), random_state=42)
+
+    fig4 = px.scatter(sample, x='churn_probability', y='predicted_clv',
+                      color='segment', color_discrete_map=SEGMENT_COLORS,
+                      opacity=0.6, size_max=8,
+                      labels={'churn_probability': 'Churn Riski',
+                              'predicted_clv': 'Tahmini CLV ($)',
+                              'segment': 'Segment'})
+    fig4.add_vline(x=0.5, line_dash="dash", line_color="#ef4444",
+                   annotation_text="Risk Eşiği", annotation_font_color="#ef4444")
+    fig4.update_layout(**PLOTLY_THEME, height=350)
+    st.plotly_chart(fig4, use_container_width=True)
+
+    # Insight kutuları
+    high_value_at_risk = clv_churn[(clv_churn['churn_probability'] > 0.5) &
+                                    (clv_churn['predicted_clv'] > clv['predicted_clv'].quantile(0.75))]
+    st.markdown("<div class='section-title'>💡 Önemli Bulgular</div>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(f"""<div class='insight-box'>
+        Müşterilerin en değerli <strong>%10'u</strong> toplam CLV'nin
+        <strong>%{top10_pct:.0f}'ini</strong> oluşturuyor. Bu grubu elde tutmak kritik.
+        </div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""<div class='insight-box'>
+        <strong>{len(high_value_at_risk):,}</strong> yüksek değerli müşteri churn riski taşıyor.
+        Bu grup için acil retention kampanyası önerilir.
+        </div>""", unsafe_allow_html=True)
+    with c3:
+        champ_clv = seg_clv[seg_clv['segment']=='Şampiyonlar']['avg_clv'].values
+        champ_val = champ_clv[0] if len(champ_clv) > 0 else 0
+        st.markdown(f"""<div class='insight-box'>
+        Şampiyonların ortalama CLV'si <strong>${champ_val:.0f}</strong>.
+        Sadık müşterilere kıyasla çok daha yüksek değer üretiyorlar.
+        </div>""", unsafe_allow_html=True)
 
 
 
