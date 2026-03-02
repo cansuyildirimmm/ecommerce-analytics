@@ -309,7 +309,8 @@ with st.sidebar:
         "📈 Trend Analizi",
         "🔮 Churn Tahmini",
         "🎯 Kampanya Simülatörü",
-        "🔍 Müşteri Sorgulama"
+        "🔍 Müşteri Sorgulama",
+        "🔄 Cohort Analizi"
     ], label_visibility="collapsed")
 
     st.divider()
@@ -855,3 +856,140 @@ elif page == "🔍 Müşteri Sorgulama":
     sample['monetary'] = sample['monetary'].round(1).astype(str) + '$'
     sample.columns = ['ID','Segment','Recency','Sıklık','Harcama','RFM Skoru','Churn Riski']
     st.dataframe(sample, use_container_width=True, hide_index=True)
+
+# ══════════════════════════════════════════
+# SAYFA 7: COHORT ANALİZİ
+# ══════════════════════════════════════════
+elif page == "🔄 Cohort Analizi":
+    st.markdown("### Cohort Analizi — Müşteri Retention")
+    st.markdown("<div style='color:#94a3b8; margin-bottom:1.5rem;'>Her ay gelen yeni müşterilerin sonraki aylarda ne kadarı geri döndüğünü gösterir.</div>", unsafe_allow_html=True)
+
+    @st.cache_data
+    def load_cohort():
+        retention = pd.read_csv('data/cohort_retention.csv', index_col=0)
+        counts = pd.read_csv('data/cohort_counts.csv', index_col=0)
+        return retention, counts
+
+    retention, counts = load_cohort()
+
+    retention.columns = [f'Ay {int(float(c))}' for c in retention.columns]
+    counts.columns = [f'Ay {int(float(c))}' for c in counts.columns]
+
+    avg_month1 = retention['Ay 1'].mean()
+    avg_month2 = retention['Ay 2'].mean()
+    best_cohort = retention['Ay 1'].idxmax()
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(f"""<div class='kpi-card'>
+            <div class='kpi-label'>📅 Ort. 1. Ay Retention</div>
+            <div class='kpi-value' style='color:#00d4ff;'>%{avg_month1:.1f}</div>
+            <div class='kpi-delta-negative'>İlk ayda geri dönen</div>
+        </div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""<div class='kpi-card'>
+            <div class='kpi-label'>📅 Ort. 2. Ay Retention</div>
+            <div class='kpi-value' style='color:#7c3aed;'>%{avg_month2:.1f}</div>
+            <div class='kpi-delta-negative'>İkinci ayda geri dönen</div>
+        </div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""<div class='kpi-card'>
+            <div class='kpi-label'>🏆 En İyi Cohort</div>
+            <div class='kpi-value' style='color:#10b981; font-size:1.3rem;'>{best_cohort}</div>
+            <div class='kpi-delta-positive'>En yüksek 1. ay retention</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Isı haritası
+    st.markdown("<div class='section-title'>🌡️ Retention Isı Haritası (%)</div>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#94a3b8; font-size:0.85rem; margin-bottom:1rem;'>Ay 0 = müşterinin ilk alışveriş ayı (%100). Sonraki aylar geri dönüş oranını gösterir.</p>", unsafe_allow_html=True)
+
+    import numpy as np
+    text_values = [[f'{v:.1f}%' if not np.isnan(v) else '' for v in row] for row in retention.values]
+
+    fig = go.Figure(data=go.Heatmap(
+        z=retention.values,
+        x=retention.columns.tolist(),
+        y=retention.index.tolist(),
+        colorscale=[
+            [0.0,  '#0a0a0f'],
+            [0.1,  '#1a1a3e'],
+            [0.2,  '#2d1b69'],
+            [0.4,  '#7c3aed'],
+            [0.7,  '#00d4ff'],
+            [1.0,  '#10b981']
+        ],
+        text=text_values,
+        texttemplate='%{text}',
+        textfont=dict(color='white', size=13),
+        hoverongaps=False,
+        showscale=True,
+        colorbar=dict(
+            tickfont=dict(color='#f1f5f9'),
+            title=dict(text='Retention %', font=dict(color='#f1f5f9'))
+        )
+    ))
+    fig.update_layout(**PLOTLY_THEME, height=350)
+    fig.update_layout(
+        xaxis=dict(title='Cohort Ayı', tickfont=dict(color='#f1f5f9'), gridcolor='#1e2035'),
+        yaxis=dict(title='İlk Alışveriş Ayı', tickfont=dict(color='#f1f5f9'), gridcolor='#1e2035')
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("<div class='section-title'>📉 Retention Trendi</div>", unsafe_allow_html=True)
+        avg_retention = retention.mean()
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(
+            x=avg_retention.index,
+            y=avg_retention.values,
+            mode='lines+markers',
+            line=dict(color='#00d4ff', width=3),
+            marker=dict(size=10, color='#7c3aed'),
+            fill='tozeroy',
+            fillcolor='rgba(0,212,255,0.08)'
+        ))
+        fig2.update_layout(**PLOTLY_THEME, height=280)
+        fig2.update_layout(
+            yaxis_title='Ort. Retention (%)',
+            xaxis_title='Cohort Ayı'
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+
+    with col2:
+        st.markdown("<div class='section-title'>👥 Cohort Büyüklükleri</div>", unsafe_allow_html=True)
+        cohort_sizes = counts['Ay 0'].reset_index()
+        cohort_sizes.columns = ['Cohort', 'Müşteri Sayısı']
+        fig3 = px.bar(cohort_sizes, x='Cohort', y='Müşteri Sayısı',
+                      color='Müşteri Sayısı',
+                      color_continuous_scale=['#1a1a3e', '#7c3aed', '#00d4ff'])
+        fig3.update_layout(**PLOTLY_THEME, height=280, coloraxis_showscale=False)
+        st.plotly_chart(fig3, use_container_width=True)
+
+    st.markdown("<div class='section-title'>💡 Önemli Bulgular</div>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(f"""<div class='insight-box'>
+        İlk aydan sonra müşterilerin <strong>%{100-avg_month1:.0f}'i</strong> bir daha gelmedi.
+        Onboarding kampanyası bu grubu hedeflemeli.
+        </div>""", unsafe_allow_html=True)
+    with c2:
+        oct_ret = float(retention.loc['2019-10', 'Ay 1']) if '2019-10' in retention.index else 0
+        st.markdown(f"""<div class='insight-box'>
+        En büyük cohort <strong>Ekim 2019</strong> — 1. ay retention <strong>%{oct_ret:.1f}</strong>.
+        İlk 30 gün müşteri deneyimi kritik.
+        </div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""<div class='insight-box'>
+        2. aydan sonra retention <strong>%{avg_month2:.1f}</strong> seviyesinde sabitlenmiş.
+        Bu oran sadık müşteri tabanını temsil ediyor.
+        </div>""", unsafe_allow_html=True)
+
+
+
+
+
+
+
