@@ -304,14 +304,14 @@ with st.sidebar:
 
     st.markdown("**Navigasyon**")
     page = st.radio("", [
-        "📊 Genel Bakış",
-        "👥 Segment Analizi",
-        "📈 Trend Analizi",
-        "🔮 Churn Tahmini",
-        "🎯 Kampanya Simülatörü",
-        "🔍 Müşteri Sorgulama",
-        "🔄 Cohort Analizi",
-        "💰 CLV Analizi"
+        "Genel Bakış",
+        "Segment Analizi",
+        "Trend Analizi",
+        "Churn Tahmini",
+        "Kampanya Simülatörü",
+        "Müşteri Sorgulama",
+        "Cohort Analizi",
+        "CLV Analizi"
     ], label_visibility="collapsed")
 
     st.divider()
