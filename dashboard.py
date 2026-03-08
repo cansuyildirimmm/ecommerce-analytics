@@ -311,7 +311,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("**Navigasyon**")
     page = st.radio("", [
         "Genel Bakış",
         "Segment Analizi",
@@ -320,7 +319,8 @@ with st.sidebar:
         "Kampanya Simülatörü",
         "Müşteri Sorgulama",
         "Cohort Analizi",
-        "CLV Analizi"
+        "CLV Analizi",
+        "Model Performansı"
     ], label_visibility="collapsed")
 
     st.divider()
@@ -1126,8 +1126,197 @@ elif page == "CLV Analizi":
         Sadık müşterilere kıyasla çok daha yüksek değer üretiyorlar.
         </div>""", unsafe_allow_html=True)
 
+# ══════════════════════════════════════════
+# SAYFA 9: MODEL PERFORMANSI
+# ══════════════════════════════════════════
+elif page == "Model Performansı":
+    st.markdown("### Churn Model Performans Analizi")
+    st.markdown("<div style='color:#94a3b8; margin-bottom:1.5rem;'>Random Forest modelinin detaylı performans metrikleri ve açıklanabilirlik analizleri.</div>", unsafe_allow_html=True)
 
+    import json
 
+    @st.cache_data
+    def load_model_data():
+        with open('data/model_metrics.json', 'r') as f:
+            metrics = json.load(f)
+        roc     = pd.read_csv('data/roc_curve.csv')
+        lift    = pd.read_csv('data/lift_curve.csv')
+        pr      = pd.read_csv('data/pr_curve.csv')
+        shap_m  = pd.read_csv('data/shap_mean.csv')
+        feat_imp = pd.read_csv('data/feature_importance.csv')
+        return metrics, roc, lift, pr, shap_m, feat_imp
+
+    metrics, roc, lift, pr, shap_m, feat_imp = load_model_data()
+    cm = metrics['confusion_matrix']
+
+    # ── KPI Kartları ──
+    c1, c2, c3, c4, c5 = st.columns(5)
+    kpis = [
+        (c1, "Accuracy",  f"%{metrics['accuracy']*100:.1f}",  "#00d4ff"),
+        (c2, "Precision", f"%{metrics['precision']*100:.1f}", "#7c3aed"),
+        (c3, "Recall",    f"%{metrics['recall']*100:.1f}",    "#10b981"),
+        (c4, "F1 Score",  f"%{metrics['f1']*100:.1f}",        "#f59e0b"),
+        (c5, "ROC AUC",   f"{metrics['roc_auc']:.3f}",        "#ef4444"),
+    ]
+    for col, label, val, color in kpis:
+        with col:
+            st.markdown(f"""<div class='kpi-card'>
+                <div class='kpi-label'>{label}</div>
+                <div class='kpi-value' style='color:{color}; font-size:1.6rem;'>{val}</div>
+            </div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Confusion Matrix + ROC ──
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("<div class='section-title'>Confusion Matrix</div>", unsafe_allow_html=True)
+        cm_data = [[cm['tn'], cm['fp']], [cm['fn'], cm['tp']]]
+        cm_labels = [['TN', 'FP'], ['FN', 'TP']]
+        cm_text = [[f"{cm_labels[i][j]}<br>{cm_data[i][j]:,}" for j in range(2)] for i in range(2)]
+        fig_cm = go.Figure(data=go.Heatmap(
+            z=cm_data,
+            x=['Tahmin: Aktif', 'Tahmin: Churn'],
+            y=['Gerçek: Aktif', 'Gerçek: Churn'],
+            colorscale=[[0, '#1a1a3e'], [0.5, '#7c3aed'], [1, '#10b981']],
+            text=cm_text,
+            texttemplate='%{text}',
+            textfont=dict(color='white', size=14),
+            showscale=False
+        ))
+        fig_cm.update_layout(**PLOTLY_THEME, height=300)
+        st.plotly_chart(fig_cm, use_container_width=True)
+
+        mape_val = metrics.get('mape', 0)
+        st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
+        <strong>MAPE:</strong> %{mape_val:.1f} — Model tahmin olasılıkları gerçek etiketlerden
+        ortalama <strong>%{mape_val:.1f}</strong> sapıyor.
+        </div>""", unsafe_allow_html=True)
+
+    with col2:
+        st.markdown("<div class='section-title'>ROC Eğrisi (AUC = {:.3f})</div>".format(metrics['roc_auc']), unsafe_allow_html=True)
+        fig_roc = go.Figure()
+        fig_roc.add_trace(go.Scatter(
+            x=roc['fpr'], y=roc['tpr'],
+            mode='lines', name=f"Model (AUC={metrics['roc_auc']:.3f})",
+            line=dict(color='#00d4ff', width=3),
+            fill='tozeroy', fillcolor='rgba(0,212,255,0.08)'
+        ))
+        fig_roc.add_trace(go.Scatter(
+            x=[0,1], y=[0,1], mode='lines',
+            name='Rastgele Tahmin',
+            line=dict(color='#475569', width=1, dash='dash')
+        ))
+        fig_roc.update_layout(**PLOTLY_THEME, height=300,
+                              xaxis_title='False Positive Rate',
+                              yaxis_title='True Positive Rate')
+        st.plotly_chart(fig_roc, use_container_width=True)
+
+    # ── Lift + Precision-Recall ──
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("<div class='section-title'>Lift Eğrisi</div>", unsafe_allow_html=True)
+        fig_lift = go.Figure()
+        fig_lift.add_trace(go.Bar(
+            x=lift['decile_label'].astype(str) + '%',
+            y=lift['lift'],
+            marker_color='#7c3aed',
+            text=lift['lift'].round(2),
+            texttemplate='%{text}x',
+            textposition='outside',
+            textfont=dict(color='#f1f5f9')
+        ))
+        fig_lift.add_hline(y=1.0, line_dash='dash', line_color='#475569',
+                           annotation_text='Baseline', annotation_font_color='#94a3b8')
+        fig_lift.update_layout(**PLOTLY_THEME, height=300,
+                               xaxis_title='Müşteri Yüzdesi (En Riskli → En Az Riskli)',
+                               yaxis_title='Lift')
+        st.plotly_chart(fig_lift, use_container_width=True)
+
+    with col2:
+        st.markdown("<div class='section-title'>Precision-Recall Eğrisi</div>", unsafe_allow_html=True)
+        fig_pr = go.Figure()
+        fig_pr.add_trace(go.Scatter(
+            x=pr['recall'], y=pr['precision'],
+            mode='lines', line=dict(color='#10b981', width=3),
+            fill='tozeroy', fillcolor='rgba(16,185,129,0.08)'
+        ))
+        fig_pr.update_layout(**PLOTLY_THEME, height=300,
+                             xaxis_title='Recall', yaxis_title='Precision')
+        st.plotly_chart(fig_pr, use_container_width=True)
+
+    # ── SHAP + Feature Importance ──
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("<div class='section-title'>SHAP — Feature Etki Analizi</div>", unsafe_allow_html=True)
+        st.markdown("<p style='color:#94a3b8; font-size:0.83rem; margin-bottom:0.8rem;'>Modelin tahmin yaparken her feature'a ne kadar ağırlık verdiğini gösterir.</p>", unsafe_allow_html=True)
+        fig_shap = go.Figure(go.Bar(
+            x=shap_m['shap_value'],
+            y=shap_m['feature'],
+            orientation='h',
+            marker=dict(
+                color=shap_m['shap_value'],
+                colorscale=[[0,'#1a1a3e'],[0.5,'#7c3aed'],[1,'#00d4ff']],
+                showscale=False
+            ),
+            text=shap_m['shap_value'].round(3),
+            textposition='outside',
+            textfont=dict(color='#f1f5f9')
+        ))
+        fig_shap.update_layout(**PLOTLY_THEME, height=300)
+        fig_shap.update_layout(xaxis_title='Ortalama |SHAP Degeri|',
+                               yaxis=dict(autorange='reversed'))
+        st.plotly_chart(fig_shap, use_container_width=True)
+
+    with col2:
+        st.markdown("<div class='section-title'>Feature Importance</div>", unsafe_allow_html=True)
+        fig_fi = go.Figure(go.Bar(
+            x=feat_imp['importance'],
+            y=feat_imp['feature'],
+            orientation='h',
+            marker=dict(
+                color=feat_imp['importance'],
+                colorscale=[[0,'#1a1a3e'],[0.5,'#f59e0b'],[1,'#10b981']],
+                showscale=False
+            ),
+            text=(feat_imp['importance']*100).round(1),
+            texttemplate='%{text}%',
+            textposition='outside',
+            textfont=dict(color='#f1f5f9')
+        ))
+        fig_fi.update_layout(**PLOTLY_THEME, height=300)
+        fig_fi.update_layout(xaxis_title='Onem Skoru',
+                             yaxis=dict(autorange='reversed'))
+        st.plotly_chart(fig_fi, use_container_width=True)
+
+    # ── Insight Kutuları ──
+    st.markdown("<div class='section-title'>Önemli Bulgular</div>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    top_shap = shap_m.iloc[0]
+    lift_top = lift.iloc[0]['lift']
+    with c1:
+        st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
+        En etkili feature <strong>{top_shap['feature']}</strong> — SHAP değeri
+        <strong>{top_shap['shap_value']:.3f}</strong>. Modelin tahminlerini
+        en çok bu değişken yönlendiriyor.
+        </div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
+        Model en riskli <strong>%10 müşteriyi</strong> rastgele tahminden
+        <strong>{lift_top:.1f}x</strong> daha iyi tespit ediyor.
+        Kampanya bütçesi bu gruba odaklanmalı.
+        </div>""", unsafe_allow_html=True)
+    with c3:
+        fp_cost = cm['fp']
+        fn_cost = cm['fn']
+        st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
+        Model <strong>{fp_cost:,}</strong> aktif müşteriyi yanlışlıkla riskli gördü (FP),
+        <strong>{fn_cost:,}</strong> churn müşteriyi kaçırdı (FN).
+        FN maliyeti genellikle daha yüksektir.
+        </div>""", unsafe_allow_html=True)
 
 
 
