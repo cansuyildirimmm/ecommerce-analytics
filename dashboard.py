@@ -695,6 +695,72 @@ elif page == "Churn Tahmini":
                     <div style='color:#cbd5e1; margin-top:0.8rem; font-size:0.85rem;'>👉 Sadakat programına dahil et!</div>
                     </div>""", unsafe_allow_html=True)
 
+                # ── SHAP Tekil Açıklama ──
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("<div class='section-title'>Bu Müşteri Neden Riskli?</div>", unsafe_allow_html=True)
+                st.markdown("<p style='color:#94a3b8; font-size:0.83rem; margin-bottom:1rem;'>SHAP analizi — hangi özellikler bu tahmini yönlendiriyor?</p>", unsafe_allow_html=True)
+
+                try:
+                    import shap
+                    features = ['frequency', 'monetary', 'avg_order_value',
+                                'is_one_time', 'high_spender', 'rfm_score_norm']
+
+                    avg_order = r['monetary'] / r['frequency']
+                    is_one_time = 1 if r['frequency'] == 1 else 0
+                    high_spender = 1 if r['monetary'] > rfm['monetary'].quantile(0.75) else 0
+                    rfm_score_norm = r['rfm_score'] / 12
+
+                    inp = pd.DataFrame([[
+                        r['frequency'], r['monetary'], avg_order,
+                        is_one_time, high_spender, rfm_score_norm
+                    ]], columns=features)
+
+                    explainer = shap.TreeExplainer(model)
+                    shap_vals = explainer.shap_values(inp)
+
+                    if isinstance(shap_vals, list):
+                        sv = shap_vals[1][0]
+                    elif len(np.array(shap_vals).shape) == 3:
+                        sv = np.array(shap_vals)[0, :, 1]
+                    else:
+                        sv = shap_vals[0]
+
+                    shap_df = pd.DataFrame({
+                        'Feature': features,
+                        'Deger': inp.values[0],
+                        'SHAP': sv
+                    }).sort_values('SHAP', key=abs, ascending=False)
+
+                    colors = ['#ef4444' if x > 0 else '#10b981' for x in shap_df['SHAP']]
+
+                    fig_s = go.Figure(go.Bar(
+                        x=shap_df['SHAP'],
+                        y=shap_df['Feature'],
+                        orientation='h',
+                        marker_color=colors,
+                        text=[f"{v:.3f}" for v in shap_df['SHAP']],
+                        textposition='outside',
+                        textfont=dict(color='#f1f5f9')
+                    ))
+                    fig_s.add_vline(x=0, line_color='#475569', line_width=1)
+                    fig_s.update_layout(**PLOTLY_THEME, height=280)
+                    fig_s.update_layout(
+                        xaxis_title='SHAP Degeri (+ churn riskini artiriyor, - azaltiyor)',
+                        yaxis=dict(autorange='reversed')
+                    )
+                    st.plotly_chart(fig_s, use_container_width=True)
+
+                    # Açıklama metni
+                    top = shap_df.iloc[0]
+                    direction = "artırıyor" if top['SHAP'] > 0 else "azaltıyor"
+                    st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
+                    En etkili faktör: <strong>{top['Feature']}</strong> (değer: <strong>{top['Deger']:.2f}</strong>)
+                    — bu müşterinin churn riskini en çok <strong>{direction}</strong>.
+                    </div>""", unsafe_allow_html=True)
+
+                except Exception as e:
+                    st.info(f"SHAP analizi yüklenemedi: {e}")
+
     with col2:
         st.markdown("<div class='section-title'>Churn Olasılığı Dağılımı</div>", unsafe_allow_html=True)
         fig = px.histogram(rfm, x='churn_probability', nbins=50,
