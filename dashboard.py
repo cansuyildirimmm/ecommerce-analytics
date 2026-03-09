@@ -307,7 +307,7 @@ with st.sidebar:
     st.markdown("""
     <div style='padding: 1rem 0 1.5rem;'>
         <div style='font-size:1.4rem; font-weight:700; background: linear-gradient(90deg, #00d4ff, #7c3aed); -webkit-background-clip:text; -webkit-text-fill-color:transparent;'>⚡ CustomerIQ</div>
-        <div style='color:#475569; font-size:0.75rem; letter-spacing:0.1em; text-transform:uppercase; margin-top:0.3rem;'>Analytics Platform</div>
+        <div style='color:#94a3b8; font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; margin-top:0.3rem;'>Analytics Platform</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -345,7 +345,6 @@ st.markdown("""
 # SAYFA 1: GENEL BAKIŞ
 # ══════════════════════════════════════════
 if page == "Genel Bakış":
-    # KPI Kartları
     total = len(rfm)
     churn_n = int(rfm['churn_risk'].sum())
     total_rev = rfm['monetary'].sum()
@@ -374,9 +373,7 @@ if page == "Genel Bakış":
             """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
     col1, col2 = st.columns([1, 1])
-
     with col1:
         st.markdown("<div class='section-title'>Segment Dağılımı</div>", unsafe_allow_html=True)
         seg = rfm['segment'].value_counts().reset_index()
@@ -389,7 +386,6 @@ if page == "Genel Bakış":
         fig.update_layout(legend=dict(orientation='h', y=-0.1, x=0.5, xanchor='center',
                                       bgcolor='rgba(0,0,0,0)', font=dict(color='#f1f5f9')))
         st.plotly_chart(fig, use_container_width=True)
-
     with col2:
         st.markdown("<div class='section-title'>Segment Başına Ortalama Gelir</div>", unsafe_allow_html=True)
         rev = rfm.groupby('segment')['monetary'].mean().reset_index()
@@ -407,13 +403,11 @@ if page == "Genel Bakış":
         st.markdown("<div class='section-title'>RFM Dağılımı</div>", unsafe_allow_html=True)
         sample = rfm.sample(min(3000, len(rfm)), random_state=42)
         fig = px.scatter(sample, x='frequency', y='monetary',
-                         color='segment', color_discrete_map=SEGMENT_COLORS,
-                         opacity=0.6,
+                         color='segment', color_discrete_map=SEGMENT_COLORS, opacity=0.6,
                          labels={'frequency': 'Alışveriş Sıklığı', 'monetary': 'Toplam Harcama ($)'})
         fig.update_traces(marker=dict(size=4))
         fig.update_layout(**PLOTLY_THEME, height=300)
         st.plotly_chart(fig, use_container_width=True)
-
     with col2:
         st.markdown("<div class='section-title'>Churn Riski — Segment Bazlı</div>", unsafe_allow_html=True)
         churn_seg = rfm.groupby('segment')['churn_risk'].mean().reset_index()
@@ -422,11 +416,9 @@ if page == "Genel Bakış":
                      color='pct', color_continuous_scale=['#10b981', '#f59e0b', '#ef4444'],
                      labels={'pct': 'Churn Riski (%)', 'segment': ''})
         fig.update_traces(marker_line_width=0)
-        fig.update_layout(**PLOTLY_THEME, height=300,
-                          coloraxis_showscale=False)
+        fig.update_layout(**PLOTLY_THEME, height=300, coloraxis_showscale=False)
         st.plotly_chart(fig, use_container_width=True)
 
-    # Önemli Bulgular
     st.markdown("<div class='section-title'>💡 Önemli Bulgular</div>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -453,16 +445,9 @@ if page == "Genel Bakış":
 # ══════════════════════════════════════════
 elif page == "Segment Analizi":
     st.markdown("### Segment Detay Analizi")
-
     selected_seg = st.selectbox("Segment seç:", list(SEGMENT_COLORS.keys()))
     seg_data = rfm[rfm['segment'] == selected_seg]
 
-    badge_map = {
-        'Şampiyonlar': 'badge-champion',
-        'Sadık Müşteriler': 'badge-loyal',
-        'Uykudakiler': 'badge-sleeping',
-        'Kayıp Adayları': 'badge-lost'
-    }
     action_map = {
         'Şampiyonlar': ['VIP programına al', 'Yeni ürünleri ilk göster', 'Teşekkür e-postası gönder', 'Erken erişim kampanyası'],
         'Sadık Müşteriler': ['Sadakat puanı ver', 'Özel indirim kodu (%15)', 'Ücretsiz kargo sun', 'Referral programı'],
@@ -471,13 +456,12 @@ elif page == "Segment Analizi":
     }
 
     c1, c2, c3, c4 = st.columns(4)
-    metrics = [
+    for col, label, val in [
         (c1, "Müşteri Sayısı", f"{len(seg_data):,}"),
         (c2, "Toplam Gelir", f"${seg_data['monetary'].sum():,.0f}"),
         (c3, "Ort. Harcama", f"${seg_data['monetary'].mean():.1f}"),
         (c4, "Ort. Sıklık", f"{seg_data['frequency'].mean():.1f}x"),
-    ]
-    for col, label, val in metrics:
+    ]:
         with col:
             st.markdown(f"""<div class='kpi-card'>
                 <div class='kpi-label'>{label}</div>
@@ -486,7 +470,6 @@ elif page == "Segment Analizi":
 
     st.markdown("<br>", unsafe_allow_html=True)
     col1, col2 = st.columns([1.2, 0.8])
-
     with col1:
         st.markdown("<div class='section-title'>Harcama Dağılımı</div>", unsafe_allow_html=True)
         fig = px.histogram(seg_data, x='monetary', nbins=50,
@@ -495,7 +478,6 @@ elif page == "Segment Analizi":
         fig.update_layout(**PLOTLY_THEME, height=300,
                           xaxis_title="Toplam Harcama ($)", yaxis_title="Müşteri Sayısı")
         st.plotly_chart(fig, use_container_width=True)
-
     with col2:
         st.markdown("<div class='section-title'>🎯 Aksiyon Önerileri</div>", unsafe_allow_html=True)
         for action in action_map[selected_seg]:
@@ -509,7 +491,6 @@ elif page == "Segment Analizi":
         fig.update_layout(**PLOTLY_THEME, height=250,
                           xaxis_title="Son Alışverişten Geçen Gün", yaxis_title="")
         st.plotly_chart(fig, use_container_width=True)
-
     with col2:
         st.markdown("<div class='section-title'>Frequency Dağılımı</div>", unsafe_allow_html=True)
         fig = px.histogram(seg_data, x='frequency', nbins=40,
@@ -535,27 +516,19 @@ elif page == "Trend Analizi":
         return daily, weekly, monthly, hourly, dow, ev_month
 
     daily, weekly, monthly, hourly, dow, event_monthly = load_trends()
-
     tab1, tab2, tab3 = st.tabs(["📅 Günlük", "📆 Haftalık/Aylık", "⏰ Saat & Gün Analizi"])
 
     with tab1:
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=daily['date'], y=daily['gelir'],
+        fig.add_trace(go.Scatter(x=daily['date'], y=daily['gelir'],
             fill='tozeroy', fillcolor='rgba(0,212,255,0.08)',
-            line=dict(color='#00d4ff', width=2),
-            name='Günlük Gelir ($)'
-        ))
+            line=dict(color='#00d4ff', width=2), name='Günlük Gelir ($)'))
         fig.update_layout(**PLOTLY_THEME, height=350,
                           title=dict(text='Günlük Satış Geliri', font=dict(color='#f1f5f9', size=14)))
         st.plotly_chart(fig, use_container_width=True)
-
         fig2 = go.Figure()
-        fig2.add_trace(go.Bar(
-            x=daily['date'], y=daily['satis'],
-            marker_color='#7c3aed', opacity=0.8,
-            name='Satış Sayısı'
-        ))
+        fig2.add_trace(go.Bar(x=daily['date'], y=daily['satis'],
+            marker_color='#7c3aed', opacity=0.8, name='Satış Sayısı'))
         fig2.update_layout(**PLOTLY_THEME, height=280,
                            title=dict(text='Günlük Satış Adedi', font=dict(color='#f1f5f9', size=14)))
         st.plotly_chart(fig2, use_container_width=True)
@@ -563,21 +536,17 @@ elif page == "Trend Analizi":
     with tab2:
         col1, col2 = st.columns(2)
         with col1:
-            fig = px.bar(weekly, x='week', y='gelir',
-                         color_discrete_sequence=['#7c3aed'],
+            fig = px.bar(weekly, x='week', y='gelir', color_discrete_sequence=['#7c3aed'],
                          labels={'gelir': 'Haftalık Gelir ($)', 'week': ''})
             fig.update_layout(**PLOTLY_THEME, height=300,
                               title=dict(text='Haftalık Gelir', font=dict(color='#f1f5f9')))
             st.plotly_chart(fig, use_container_width=True)
-
         with col2:
-            fig = px.bar(monthly, x='month', y='gelir',
-                         color_discrete_sequence=['#10b981'],
+            fig = px.bar(monthly, x='month', y='gelir', color_discrete_sequence=['#10b981'],
                          labels={'gelir': 'Aylık Gelir ($)', 'month': ''})
             fig.update_layout(**PLOTLY_THEME, height=300,
                               title=dict(text='Aylık Gelir', font=dict(color='#f1f5f9')))
             st.plotly_chart(fig, use_container_width=True)
-
         fig = px.line(event_monthly, x='month', y='count', color='event_type',
                       color_discrete_sequence=['#00d4ff','#7c3aed','#10b981','#f59e0b'],
                       labels={'count': 'İşlem Sayısı', 'month': '', 'event_type': 'Event'})
@@ -588,19 +557,18 @@ elif page == "Trend Analizi":
     with tab3:
         col1, col2 = st.columns(2)
         with col1:
-            fig = px.bar(hourly, x='hour', y='count',
-                         color='count', color_continuous_scale='Blues',
+            fig = px.bar(hourly, x='hour', y='count', color='count',
+                         color_continuous_scale='Blues',
                          labels={'count': 'Satış Sayısı', 'hour': 'Saat'})
             fig.update_layout(**PLOTLY_THEME, height=300, coloraxis_showscale=False,
                               title=dict(text='Saate Göre Satış Dağılımı', font=dict(color='#f1f5f9')))
             st.plotly_chart(fig, use_container_width=True)
-
         with col2:
             day_order = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
             dow['dayofweek'] = pd.Categorical(dow['dayofweek'], categories=day_order, ordered=True)
             dow = dow.sort_values('dayofweek')
-            fig = px.bar(dow, x='dayofweek', y='count',
-                         color='count', color_continuous_scale='Purples',
+            fig = px.bar(dow, x='dayofweek', y='count', color='count',
+                         color_continuous_scale='Purples',
                          labels={'count': 'Satış Sayısı', 'dayofweek': ''})
             fig.update_layout(**PLOTLY_THEME, height=300, coloraxis_showscale=False,
                               title=dict(text='Güne Göre Satış Dağılımı', font=dict(color='#f1f5f9')))
@@ -612,7 +580,6 @@ elif page == "Trend Analizi":
 elif page == "Churn Tahmini":
     st.markdown("### Churn Tahmin Modeli")
 
-    # Özet KPI'lar
     c1, c2, c3 = st.columns(3)
     churn_n = int(rfm['churn_risk'].sum())
     safe_n = len(rfm) - churn_n
@@ -637,19 +604,15 @@ elif page == "Churn Tahmini":
         </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
     col1, col2 = st.columns([1, 1])
 
     with col1:
         st.markdown("<div class='section-title'>🔍 Müşteri ID ile Churn Sorgula</div>", unsafe_allow_html=True)
         st.markdown("<p style='color:#94a3b8; font-size:0.85rem; margin-bottom:1rem;'>Gerçek müşteri verisine dayalı tahmin yapar.</p>", unsafe_allow_html=True)
-
-        user_id_input = st.number_input(
-            "Müşteri ID",
+        user_id_input = st.number_input("Müşteri ID",
             min_value=int(rfm['user_id'].min()),
             max_value=int(rfm['user_id'].max()),
-            value=int(rfm['user_id'].iloc[0])
-        )
+            value=int(rfm['user_id'].iloc[0]))
 
         if st.button("🔮 Churn Riskini Hesapla"):
             result = rfm[rfm['user_id'] == user_id_input]
@@ -659,20 +622,18 @@ elif page == "Churn Tahmini":
                 r = result.iloc[0]
                 prob = r['churn_probability']
                 pred = r['churn_risk']
-
-                # Müşteri bilgileri
                 st.markdown(f"""
                 <div style='background:#16161f; border:1px solid #1e2035; border-radius:10px; padding:1rem; margin:1rem 0;'>
                     <div style='display:grid; grid-template-columns:1fr 1fr; gap:0.8rem;'>
-                        <div><span style='color:#475569; font-size:0.75rem; text-transform:uppercase;'>Segment</span>
+                        <div><span style='color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;'>Segment</span>
                         <div style='color:#f1f5f9; font-weight:600; margin-top:0.2rem;'>{r['segment']}</div></div>
-                        <div><span style='color:#475569; font-size:0.75rem; text-transform:uppercase;'>RFM Skoru</span>
+                        <div><span style='color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;'>RFM Skoru</span>
                         <div style='color:#00d4ff; font-family:JetBrains Mono; font-weight:700; margin-top:0.2rem;'>{int(r['rfm_score'])}/12</div></div>
-                        <div><span style='color:#475569; font-size:0.75rem; text-transform:uppercase;'>Alışveriş Sıklığı</span>
+                        <div><span style='color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;'>Alışveriş Sıklığı</span>
                         <div style='color:#f1f5f9; font-weight:600; margin-top:0.2rem;'>{int(r['frequency'])}x</div></div>
-                        <div><span style='color:#475569; font-size:0.75rem; text-transform:uppercase;'>Toplam Harcama</span>
+                        <div><span style='color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;'>Toplam Harcama</span>
                         <div style='color:#f1f5f9; font-weight:600; margin-top:0.2rem;'>${r['monetary']:.1f}</div></div>
-                        <div><span style='color:#475569; font-size:0.75rem; text-transform:uppercase;'>Recency</span>
+                        <div><span style='color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;'>Recency</span>
                         <div style='color:#f1f5f9; font-weight:600; margin-top:0.2rem;'>{int(r['recency'])} gün önce</div></div>
                     </div>
                 </div>
@@ -695,176 +656,216 @@ elif page == "Churn Tahmini":
                     <div style='color:#cbd5e1; margin-top:0.8rem; font-size:0.85rem;'>👉 Sadakat programına dahil et!</div>
                     </div>""", unsafe_allow_html=True)
 
-                # ── SHAP Tekil Açıklama ──
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.markdown("<div class='section-title'>Bu Müşteri Neden Riskli?</div>", unsafe_allow_html=True)
                 st.markdown("<p style='color:#94a3b8; font-size:0.83rem; margin-bottom:1rem;'>SHAP analizi — hangi özellikler bu tahmini yönlendiriyor?</p>", unsafe_allow_html=True)
-
                 try:
                     import shap
-                    features = ['frequency', 'monetary', 'avg_order_value',
-                                'is_one_time', 'high_spender', 'rfm_score_norm']
-
-                    avg_order = r['monetary'] / r['frequency']
+                    features = ['frequency', 'monetary', 'avg_order_value', 'is_one_time', 'high_spender', 'rfm_score_norm']
+                    avg_order_val = r['monetary'] / r['frequency']
                     is_one_time = 1 if r['frequency'] == 1 else 0
                     high_spender = 1 if r['monetary'] > rfm['monetary'].quantile(0.75) else 0
                     rfm_score_norm = r['rfm_score'] / 12
-
-                    inp = pd.DataFrame([[
-                        r['frequency'], r['monetary'], avg_order,
-                        is_one_time, high_spender, rfm_score_norm
-                    ]], columns=features)
-
+                    inp = pd.DataFrame([[r['frequency'], r['monetary'], avg_order_val,
+                        is_one_time, high_spender, rfm_score_norm]], columns=features)
                     explainer = shap.TreeExplainer(model)
                     shap_vals = explainer.shap_values(inp)
-
                     if isinstance(shap_vals, list):
                         sv = shap_vals[1][0]
                     elif len(np.array(shap_vals).shape) == 3:
                         sv = np.array(shap_vals)[0, :, 1]
                     else:
                         sv = shap_vals[0]
-
-                    shap_df = pd.DataFrame({
-                        'Feature': features,
-                        'Deger': inp.values[0],
-                        'SHAP': sv
-                    }).sort_values('SHAP', key=abs, ascending=False)
-
+                    shap_df = pd.DataFrame({'Feature': features, 'Deger': inp.values[0], 'SHAP': sv})
+                    shap_df = shap_df.sort_values('SHAP', key=abs, ascending=False)
                     colors = ['#ef4444' if x > 0 else '#10b981' for x in shap_df['SHAP']]
-
-                    fig_s = go.Figure(go.Bar(
-                        x=shap_df['SHAP'],
-                        y=shap_df['Feature'],
-                        orientation='h',
-                        marker_color=colors,
+                    fig_s = go.Figure(go.Bar(x=shap_df['SHAP'], y=shap_df['Feature'],
+                        orientation='h', marker_color=colors,
                         text=[f"{v:.3f}" for v in shap_df['SHAP']],
-                        textposition='outside',
-                        textfont=dict(color='#f1f5f9')
-                    ))
+                        textposition='outside', textfont=dict(color='#f1f5f9')))
                     fig_s.add_vline(x=0, line_color='#475569', line_width=1)
                     fig_s.update_layout(**PLOTLY_THEME, height=280)
-                    fig_s.update_layout(
-                        xaxis_title='SHAP Degeri (+ churn riskini artiriyor, - azaltiyor)',
-                        yaxis=dict(autorange='reversed')
-                    )
+                    fig_s.update_layout(xaxis_title='SHAP Degeri (+ churn riskini artiriyor, - azaltiyor)',
+                                        yaxis=dict(autorange='reversed'))
                     st.plotly_chart(fig_s, use_container_width=True)
-
-                    # Açıklama metni
                     top = shap_df.iloc[0]
                     direction = "artırıyor" if top['SHAP'] > 0 else "azaltıyor"
                     st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
                     En etkili faktör: <strong>{top['Feature']}</strong> (değer: <strong>{top['Deger']:.2f}</strong>)
                     — bu müşterinin churn riskini en çok <strong>{direction}</strong>.
                     </div>""", unsafe_allow_html=True)
-
                 except Exception as e:
                     st.info(f"SHAP analizi yüklenemedi: {e}")
 
     with col2:
         st.markdown("<div class='section-title'>Churn Olasılığı Dağılımı</div>", unsafe_allow_html=True)
-        fig = px.histogram(rfm, x='churn_probability', nbins=50,
-                           color_discrete_sequence=['#7c3aed'])
+        fig = px.histogram(rfm, x='churn_probability', nbins=50, color_discrete_sequence=['#7c3aed'])
         fig.add_vline(x=0.5, line_dash="dash", line_color="#ef4444",
                       annotation_text="Risk Eşiği", annotation_font_color="#f87171")
         fig.update_layout(**PLOTLY_THEME, height=320,
                           xaxis_title="Churn Olasılığı", yaxis_title="Müşteri Sayısı")
         st.plotly_chart(fig, use_container_width=True)
-
-        # Segment bazlı churn dağılımı
         churn_seg = rfm.groupby('segment').agg(
-            churn_oran=('churn_risk','mean'),
-            toplam=('user_id','count')
-        ).reset_index()
+            churn_oran=('churn_risk','mean'), toplam=('user_id','count')).reset_index()
         churn_seg['churn_pct'] = (churn_seg['churn_oran']*100).round(1)
         fig2 = px.bar(churn_seg, x='segment', y='churn_pct',
                       color='segment', color_discrete_map=SEGMENT_COLORS,
                       labels={'churn_pct':'Churn Oranı (%)', 'segment':''}, text='churn_pct')
-        fig2.update_traces(texttemplate='%{text}%', textposition='outside',
-                           textfont=dict(color='#f1f5f9'))
+        fig2.update_traces(texttemplate='%{text}%', textposition='outside', textfont=dict(color='#f1f5f9'))
         fig2.update_layout(**PLOTLY_THEME, height=280, showlegend=False)
         st.plotly_chart(fig2, use_container_width=True)
 
     st.divider()
-
-    # Toplu risk tablosu
     st.markdown("<div class='section-title'>⚡ En Yüksek Riskli 20 Müşteri</div>", unsafe_allow_html=True)
     high_risk = rfm[rfm['churn_risk']==1].nlargest(20, 'churn_probability')[
-        ['user_id','segment','frequency','monetary','recency','churn_probability']
-    ].copy()
+        ['user_id','segment','frequency','monetary','recency','churn_probability']].copy()
     high_risk['churn_probability'] = (high_risk['churn_probability']*100).round(1).astype(str) + '%'
     high_risk['monetary'] = high_risk['monetary'].round(1).astype(str) + '$'
     high_risk.columns = ['Müşteri ID','Segment','Sıklık','Harcama','Recency (gün)','Risk']
     st.dataframe(high_risk, use_container_width=True, hide_index=True)
 
 # ══════════════════════════════════════════
-# SAYFA 5: KAMPANYA SİMÜLATÖRÜ
+# SAYFA 5: KAMPANYA SİMÜLATÖRÜ (YENİ)
 # ══════════════════════════════════════════
 elif page == "Kampanya Simülatörü":
     st.markdown("### Kampanya Simülatörü")
-    st.markdown("<div style='color:#94a3b8; margin-bottom:1.5rem;'>Farklı kampanyaların kaç müşteriye ulaşacağını ve tahmini gelir etkisini hesapla.</div>", unsafe_allow_html=True)
+    st.markdown("<div style='color:#94a3b8; margin-bottom:1.5rem;'>Churn riski taşıyan müşterilere yönelik kampanya ROI'sini CLV bazlı olarak hesapla.</div>", unsafe_allow_html=True)
 
-    col1, col2 = st.columns([1, 1])
+    @st.cache_data
+    def load_clv_camp():
+        return pd.read_csv('data/clv_data.csv')
+    clv_data = load_clv_camp()
+
+    col1, col2 = st.columns([1, 1.4])
 
     with col1:
         st.markdown("<div class='section-title'>Kampanya Parametreleri</div>", unsafe_allow_html=True)
-        campaign_type = st.selectbox("Kampanya Türü", [
-            "💌 E-posta Kampanyası",
-            "🎁 İndirim Kuponu",
-            "🚀 VIP Erken Erişim",
-            "🔄 Geri Kazanım Kampanyası"
-        ])
         target_segments = st.multiselect("Hedef Segmentler",
             list(SEGMENT_COLORS.keys()),
             default=['Uykudakiler', 'Kayıp Adayları'])
-        discount_rate = st.slider("İndirim Oranı (%)", 0, 50, 20)
+        discount_rate   = st.slider("İndirim Oranı (%)", 0, 50, 20)
         conversion_rate = st.slider("Tahmini Dönüşüm Oranı (%)", 1, 50, 15)
+        cost_per_contact = st.slider("Müşteri Başına İletişim Maliyeti ($)", 0.0, 5.0, 0.05, step=0.05,
+                                    help="E-posta ~$0.01-0.05 | SMS ~$0.05-0.20 | Direkt posta ~$1-3")
+        avg_clv_mult    = st.slider("Kurtarılan Müşteri CLV Çarpanı", 0.1, 1.0, 0.5, step=0.05,
+                                    help="Kurtarılan müşterinin CLV'sinin ne kadarını realize edebileceğimiz tahmini.")
 
     with col2:
         st.markdown("<div class='section-title'>📊 Simülasyon Sonuçları</div>", unsafe_allow_html=True)
 
         if target_segments:
-            target = rfm[rfm['segment'].isin(target_segments)]
-            target_count = len(target)
-            converted = int(target_count * conversion_rate / 100)
-            avg_spend = target['monetary'].mean()
-            potential_rev = converted * avg_spend * (1 - discount_rate/100)
-            cost = converted * avg_spend * (discount_rate/100)
-            roi = ((potential_rev - cost) / cost * 100) if cost > 0 else 0
+            # Sadece churn_risk=1 müşterileri hedefle
+            churn_targets = rfm[(rfm['segment'].isin(target_segments)) & (rfm['churn_risk'] == 1)]
+            target_count  = len(churn_targets)
+            converted     = int(target_count * conversion_rate / 100)
 
-            metrics = [
-                ("🎯 Hedef Müşteri", f"{target_count:,}"),
-                ("✅ Tahmini Dönüşüm", f"{converted:,}"),
-                ("💰 Tahmini Gelir", f"${potential_rev:,.0f}"),
-                ("💸 Kampanya Maliyeti", f"${cost:,.0f}"),
-                ("📈 Tahmini ROI", f"%{roi:.0f}"),
+            # CLV'yi merge et
+            merged = churn_targets.merge(clv_data[['user_id','predicted_clv']], on='user_id', how='left')
+            avg_clv   = merged['predicted_clv'].mean() if len(merged) > 0 else 0
+            avg_spend = merged['monetary'].mean() if len(merged) > 0 else 0
+
+            # Hesaplamalar
+            saved_rev     = converted * avg_clv * avg_clv_mult
+            contact_cost  = target_count * cost_per_contact
+            discount_cost = converted * avg_spend * (discount_rate / 100)
+            total_cost    = contact_cost + discount_cost
+            net_gain      = saved_rev - total_cost
+            roi           = (net_gain / total_cost * 100) if total_cost > 0 else 0
+            breakeven     = int(total_cost / (avg_clv * avg_clv_mult)) if (avg_clv * avg_clv_mult) > 0 else 0
+
+            # 8 metrik kartı
+            metrics_data = [
+                ("🎯 Hedef Müşteri (Churn)", f"{target_count:,}", "#94a3b8"),
+                ("✅ Tahmini Dönüşüm", f"{converted:,}", "#00d4ff"),
+                ("💡 Ort. CLV", f"${avg_clv:,.0f}", "#7c3aed"),
+                ("💰 Kurtarılan Gelir (CLV)", f"${saved_rev:,.0f}", "#10b981"),
+                ("📬 İletişim Maliyeti", f"${contact_cost:,.0f}", "#f59e0b"),
+                ("🏷️ İndirim Maliyeti", f"${discount_cost:,.0f}", "#f59e0b"),
+                ("💸 Toplam Maliyet", f"${total_cost:,.0f}", "#ef4444"),
+                ("📈 Net Kazanç", f"${net_gain:,.0f}", "#10b981" if net_gain >= 0 else "#ef4444"),
             ]
-            if roi > 300:
-                st.markdown("""<div style='background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);
-                border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.8rem; font-size:0.82rem; color:#f59e0b;'>
-                ⚠️ <strong>Not:</strong> Bu tahmini bir ROI'dir. Operasyonel giderler ve sabit maliyetler
-                dahil değildir — gerçek ROI daha düşük olacaktır.
-                </div>""", unsafe_allow_html=True)
-            for label, val in metrics:
-                st.markdown(f"""<div class='kpi-card' style='margin-bottom:0.6rem; padding:0.9rem;'>
-                <div style='display:flex; justify-content:space-between; align-items:center;'>
-                    <span style='color:#94a3b8; font-size:0.82rem;'>{label}</span>
-                    <span style='font-family:JetBrains Mono; color:#00d4ff; font-weight:600;'>{val}</span>
-                </div></div>""", unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
+            for i, (label, val, color) in enumerate(metrics_data):
+                col = c1 if i % 2 == 0 else c2
+                with col:
+                    st.markdown(f"""<div class='kpi-card' style='margin-bottom:0.5rem; padding:0.8rem;'>
+                    <div style='display:flex; justify-content:space-between; align-items:center;'>
+                        <span style='color:#94a3b8; font-size:0.78rem;'>{label}</span>
+                        <span style='font-family:JetBrains Mono; color:{color}; font-weight:700; font-size:0.95rem;'>{val}</span>
+                    </div></div>""", unsafe_allow_html=True)
 
-            # Segment breakdown
-            st.markdown("<br><div class='section-title'>Segment Bazlı Dağılım</div>", unsafe_allow_html=True)
-            breakdown = rfm[rfm['segment'].isin(target_segments)].groupby('segment').agg(
-                count=('user_id','count'),
-                avg_monetary=('monetary','mean')
-            ).reset_index()
-            fig = px.bar(breakdown, x='segment', y='count',
-                         color='segment', color_discrete_map=SEGMENT_COLORS,
-                         labels={'count': 'Müşteri Sayısı', 'segment': ''})
-            fig.update_layout(**PLOTLY_THEME, height=250, showlegend=False)
-            st.plotly_chart(fig, use_container_width=True)
+            # ROI kutusu
+            roi_color = "#10b981" if roi >= 0 else "#ef4444"
+            roi_icon  = "🚀" if roi >= 100 else ("✅" if roi >= 0 else "⚠️")
+            st.markdown(f"""<div style='background:{"rgba(16,185,129,0.1)" if roi>=0 else "rgba(239,68,68,0.1)"};
+            border:1px solid {"rgba(16,185,129,0.35)" if roi>=0 else "rgba(239,68,68,0.35)"};
+            border-radius:10px; padding:1rem 1.2rem; margin:0.5rem 0;'>
+            <div style='display:flex; justify-content:space-between; align-items:center;'>
+                <span style='color:#f1f5f9; font-weight:600;'>{roi_icon} Tahmini ROI</span>
+                <span style='font-family:JetBrains Mono; color:{roi_color}; font-weight:700; font-size:1.3rem;'>%{roi:.0f}</span>
+            </div>
+            </div>""", unsafe_allow_html=True)
+
+            # Break-even insight
+            st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
+            🎯 Break-even için en az <strong>{breakeven:,}</strong> müşteri kazanılmalı.
+            Mevcut tahmin: <strong>{converted:,}</strong> dönüşüm
+            {'— ✅ hedef aşılıyor!' if converted >= breakeven else '— ⚠️ hedefin altında.'}
+            </div>""", unsafe_allow_html=True)
         else:
             st.info("En az bir segment seçin.")
+
+    if target_segments and target_count > 0:
+        st.markdown("<br>", unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # Senaryo karşılaştırması
+            st.markdown("<div class='section-title'>📊 İndirim Senaryosu Karşılaştırması</div>", unsafe_allow_html=True)
+            scenarios = []
+            for d in [10, 20, 30, 40, 50]:
+                s_disc  = converted * avg_spend * (d / 100)
+                s_cost  = contact_cost + s_disc
+                s_gain  = saved_rev - s_cost
+                s_roi   = (s_gain / s_cost * 100) if s_cost > 0 else 0
+                scenarios.append({'İndirim': f'%{d}', 'Net Kazanç': round(s_gain), 'ROI': round(s_roi)})
+            sc_df = pd.DataFrame(scenarios)
+
+            fig_sc = go.Figure()
+            fig_sc.add_trace(go.Bar(
+                x=sc_df['İndirim'], y=sc_df['Net Kazanç'],
+                name='Net Kazanç ($)',
+                marker_color=['#10b981' if v >= 0 else '#ef4444' for v in sc_df['Net Kazanç']],
+                text=[f"${v:,.0f}" for v in sc_df['Net Kazanç']],
+                textposition='outside', textfont=dict(color='#f1f5f9'), yaxis='y'
+            ))
+            fig_sc.add_trace(go.Scatter(
+                x=sc_df['İndirim'], y=sc_df['ROI'],
+                name='ROI (%)', mode='lines+markers',
+                line=dict(color='#f59e0b', width=2),
+                marker=dict(size=8, color='#f59e0b'), yaxis='y2'
+            ))
+            fig_sc.update_layout(**PLOTLY_THEME, height=320)
+            fig_sc.update_layout(
+                yaxis=dict(title='Net Kazanç ($)', gridcolor='#1e2035', tickfont=dict(color='#cbd5e1')),
+                yaxis2=dict(title='ROI (%)', overlaying='y', side='right',
+                            gridcolor='rgba(0,0,0,0)', tickfont=dict(color='#f59e0b')),
+                legend=dict(orientation='h', y=-0.2, x=0.5, xanchor='center',
+                            bgcolor='rgba(0,0,0,0)', font=dict(color='#f1f5f9'))
+            )
+            st.plotly_chart(fig_sc, use_container_width=True)
+
+        with col2:
+            # Öncelikli hedef müşteriler
+            st.markdown("<div class='section-title'>🎯 Öncelikli Hedef Müşteriler</div>", unsafe_allow_html=True)
+            st.markdown("<p style='color:#94a3b8; font-size:0.83rem; margin-bottom:0.8rem;'>Yüksek CLV + churn riskli — en değerli aksiyon grubu.</p>", unsafe_allow_html=True)
+            priority = merged.nlargest(15, 'predicted_clv')[
+                ['user_id','segment','predicted_clv','churn_probability','monetary']].copy()
+            priority['predicted_clv']    = priority['predicted_clv'].round(0).astype(int).astype(str) + '$'
+            priority['churn_probability'] = (priority['churn_probability']*100).round(1).astype(str) + '%'
+            priority['monetary']          = priority['monetary'].round(1).astype(str) + '$'
+            priority.columns = ['ID','Segment','CLV','Churn Riski','Harcama']
+            st.dataframe(priority, use_container_width=True, hide_index=True)
 
 # ══════════════════════════════════════════
 # SAYFA 6: MÜŞTERİ SORGULAMA
@@ -888,12 +889,11 @@ elif page == "Müşteri Sorgulama":
             seg = r['segment']
             badge = {'Şampiyonlar':'badge-champion','Sadık Müşteriler':'badge-loyal',
                      'Uykudakiler':'badge-sleeping','Kayıp Adayları':'badge-lost'}[seg]
-
             st.markdown(f"""
             <div class='kpi-card' style='margin-bottom:1.5rem;'>
                 <div style='display:flex; justify-content:space-between; align-items:center;'>
                     <div>
-                        <div style='color:#475569; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em;'>Müşteri</div>
+                        <div style='color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;'>Müşteri</div>
                         <div style='font-family:JetBrains Mono; font-size:1.4rem; color:#f1f5f9; font-weight:700;'>{int(r['user_id'])}</div>
                     </div>
                     <span class='badge {badge}'>{seg}</span>
@@ -919,13 +919,12 @@ elif page == "Müşteri Sorgulama":
             risk_color = '#ef4444' if churn_prob > 0.5 else '#10b981'
             st.markdown(f"""
             <div class='insight-box'>
-                <strong>Churn Riski:</strong> 
+                <strong>Churn Riski:</strong>
                 <span style='color:{risk_color}; font-family:JetBrains Mono; font-weight:700;'>%{churn_prob*100:.1f}</span>
                 {"— ⚠️ Yüksek risk! Acil müdahale önerilir." if churn_prob > 0.5 else "— ✅ Düşük risk, müşteri aktif."}
             </div>
             """, unsafe_allow_html=True)
 
-    # Rastgele müşteri örnekleri
     st.markdown("<br><div class='section-title'>Rastgele Müşteri Örnekleri</div>", unsafe_allow_html=True)
     sample = rfm.sample(10)[['user_id','segment','recency','frequency','monetary','rfm_score','churn_probability']].copy()
     sample['churn_probability'] = (sample['churn_probability']*100).round(1).astype(str) + '%'
@@ -943,17 +942,16 @@ elif page == "Cohort Analizi":
     @st.cache_data
     def load_cohort():
         retention = pd.read_csv('data/cohort_retention.csv', index_col=0)
-        counts = pd.read_csv('data/cohort_counts.csv', index_col=0)
+        counts    = pd.read_csv('data/cohort_counts.csv', index_col=0)
         return retention, counts
 
     retention, counts = load_cohort()
-
     retention.columns = [f'Ay {int(float(c))}' for c in retention.columns]
-    counts.columns = [f'Ay {int(float(c))}' for c in counts.columns]
+    counts.columns    = [f'Ay {int(float(c))}' for c in counts.columns]
 
-    avg_month1 = retention['Ay 1'].mean()
-    avg_month2 = retention['Ay 2'].mean()
-    best_cohort = retention['Ay 1'].idxmax()
+    avg_month1   = retention['Ay 1'].mean()
+    avg_month2   = retention['Ay 2'].mean()
+    best_cohort  = retention['Ay 1'].idxmax()
 
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -976,35 +974,18 @@ elif page == "Cohort Analizi":
         </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # Isı haritası
     st.markdown("<div class='section-title'>🌡️ Retention Isı Haritası (%)</div>", unsafe_allow_html=True)
     st.markdown("<p style='color:#94a3b8; font-size:0.85rem; margin-bottom:1rem;'>Ay 0 = müşterinin ilk alışveriş ayı (%100). Sonraki aylar geri dönüş oranını gösterir.</p>", unsafe_allow_html=True)
 
-    import numpy as np
     text_values = [[f'{v:.1f}%' if not np.isnan(v) else '' for v in row] for row in retention.values]
-
     fig = go.Figure(data=go.Heatmap(
-        z=retention.values,
-        x=retention.columns.tolist(),
-        y=retention.index.tolist(),
-        colorscale=[
-            [0.0,  '#0a0a0f'],
-            [0.1,  '#1a1a3e'],
-            [0.2,  '#2d1b69'],
-            [0.4,  '#7c3aed'],
-            [0.7,  '#00d4ff'],
-            [1.0,  '#10b981']
-        ],
-        text=text_values,
-        texttemplate='%{text}',
-        textfont=dict(color='white', size=13),
-        hoverongaps=False,
-        showscale=True,
-        colorbar=dict(
-            tickfont=dict(color='#f1f5f9'),
-            title=dict(text='Retention %', font=dict(color='#f1f5f9'))
-        )
+        z=retention.values, x=retention.columns.tolist(), y=retention.index.tolist(),
+        colorscale=[[0.0,'#0a0a0f'],[0.1,'#1a1a3e'],[0.2,'#2d1b69'],
+                    [0.4,'#7c3aed'],[0.7,'#00d4ff'],[1.0,'#10b981']],
+        text=text_values, texttemplate='%{text}', textfont=dict(color='white', size=13),
+        hoverongaps=False, showscale=True,
+        colorbar=dict(tickfont=dict(color='#f1f5f9'),
+                      title=dict(text='Retention %', font=dict(color='#f1f5f9')))
     ))
     fig.update_layout(**PLOTLY_THEME, height=350)
     fig.update_layout(
@@ -1018,22 +999,13 @@ elif page == "Cohort Analizi":
         st.markdown("<div class='section-title'>📉 Retention Trendi</div>", unsafe_allow_html=True)
         avg_retention = retention.mean()
         fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(
-            x=avg_retention.index,
-            y=avg_retention.values,
-            mode='lines+markers',
-            line=dict(color='#00d4ff', width=3),
+        fig2.add_trace(go.Scatter(x=avg_retention.index, y=avg_retention.values,
+            mode='lines+markers', line=dict(color='#00d4ff', width=3),
             marker=dict(size=10, color='#7c3aed'),
-            fill='tozeroy',
-            fillcolor='rgba(0,212,255,0.08)'
-        ))
-        fig2.update_layout(**PLOTLY_THEME, height=280)
-        fig2.update_layout(
-            yaxis_title='Ort. Retention (%)',
-            xaxis_title='Cohort Ayı'
-        )
+            fill='tozeroy', fillcolor='rgba(0,212,255,0.08)'))
+        fig2.update_layout(**PLOTLY_THEME, height=280,
+                           yaxis_title='Ort. Retention (%)', xaxis_title='Cohort Ayı')
         st.plotly_chart(fig2, use_container_width=True)
-
     with col2:
         st.markdown("<div class='section-title'>👥 Cohort Büyüklükleri</div>", unsafe_allow_html=True)
         cohort_sizes = counts['Ay 0'].reset_index()
@@ -1073,51 +1045,34 @@ elif page == "CLV Analizi":
     @st.cache_data
     def load_clv():
         return pd.read_csv('data/clv_data.csv')
-
     clv = load_clv()
 
     c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.markdown(f"""<div class='kpi-card'>
-            <div class='kpi-label'>Toplam CLV</div>
-            <div class='kpi-value' style='color:#00d4ff; font-size:1.5rem;'>${clv['predicted_clv'].sum():,.0f}</div>
-            <div class='kpi-delta-positive'>Tüm müşteriler</div>
-        </div>""", unsafe_allow_html=True)
-    with c2:
-        st.markdown(f"""<div class='kpi-card'>
-            <div class='kpi-label'>Ortalama CLV</div>
-            <div class='kpi-value' style='color:#7c3aed; font-size:1.5rem;'>${clv['predicted_clv'].mean():,.0f}</div>
-            <div class='kpi-delta-positive'>Müşteri başına</div>
-        </div>""", unsafe_allow_html=True)
-    with c3:
-        st.markdown(f"""<div class='kpi-card'>
-            <div class='kpi-label'>Medyan CLV</div>
-            <div class='kpi-value' style='color:#10b981; font-size:1.5rem;'>${clv['predicted_clv'].median():,.0f}</div>
-            <div class='kpi-delta-positive'>Tipik müşteri</div>
-        </div>""", unsafe_allow_html=True)
-    with c4:
-        top10_pct = clv.nlargest(int(len(clv)*0.1), 'predicted_clv')['predicted_clv'].sum() / clv['predicted_clv'].sum() * 100
-        st.markdown(f"""<div class='kpi-card'>
-            <div class='kpi-label'>Top %10 Katkısı</div>
-            <div class='kpi-value' style='color:#f59e0b; font-size:1.5rem;'>%{top10_pct:.0f}</div>
-            <div class='kpi-delta-positive'>Toplam gelirden</div>
-        </div>""", unsafe_allow_html=True)
+    top10_pct = clv.nlargest(int(len(clv)*0.1), 'predicted_clv')['predicted_clv'].sum() / clv['predicted_clv'].sum() * 100
+    for col, label, val, color in [
+        (c1, "Toplam CLV",    f"${clv['predicted_clv'].sum():,.0f}",    "#00d4ff"),
+        (c2, "Ortalama CLV",  f"${clv['predicted_clv'].mean():,.0f}",   "#7c3aed"),
+        (c3, "Medyan CLV",    f"${clv['predicted_clv'].median():,.0f}", "#10b981"),
+        (c4, "Top %10 Katkısı", f"%{top10_pct:.0f}",                   "#f59e0b"),
+    ]:
+        with col:
+            st.markdown(f"""<div class='kpi-card'>
+                <div class='kpi-label'>{label}</div>
+                <div class='kpi-value' style='color:{color}; font-size:1.5rem;'>{val}</div>
+                <div class='kpi-delta-positive'>Tüm müşteriler</div>
+            </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("<div class='section-title'>CLV Dağılımı</div>", unsafe_allow_html=True)
         clv_filtered = clv[clv['predicted_clv'] < clv['predicted_clv'].quantile(0.95)]
-        fig = px.histogram(clv_filtered, x='predicted_clv', nbins=50,
-                           color_discrete_sequence=['#7c3aed'])
-        fig.add_vline(x=clv['predicted_clv'].mean(), line_dash="dash",
-                      line_color="#00d4ff", annotation_text="Ortalama",
-                      annotation_font_color="#00d4ff")
+        fig = px.histogram(clv_filtered, x='predicted_clv', nbins=50, color_discrete_sequence=['#7c3aed'])
+        fig.add_vline(x=clv['predicted_clv'].mean(), line_dash="dash", line_color="#00d4ff",
+                      annotation_text="Ortalama", annotation_font_color="#00d4ff")
         fig.update_layout(**PLOTLY_THEME, height=300,
                           xaxis_title="Tahmini CLV ($)", yaxis_title="Müşteri Sayısı")
         st.plotly_chart(fig, use_container_width=True)
-
     with col2:
         st.markdown("<div class='section-title'>Segment Bazlı Ortalama CLV</div>", unsafe_allow_html=True)
         seg_clv = clv.groupby('segment')['predicted_clv'].mean().reset_index()
@@ -1125,10 +1080,8 @@ elif page == "CLV Analizi":
         seg_clv = seg_clv.sort_values('avg_clv', ascending=False)
         fig2 = px.bar(seg_clv, x='segment', y='avg_clv',
                       color='segment', color_discrete_map=SEGMENT_COLORS,
-                      labels={'avg_clv': 'Ortalama CLV ($)', 'segment': ''},
-                      text='avg_clv')
-        fig2.update_traces(texttemplate='$%{text:.0f}', textposition='outside',
-                           textfont=dict(color='#f1f5f9'))
+                      labels={'avg_clv': 'Ortalama CLV ($)', 'segment': ''}, text='avg_clv')
+        fig2.update_traces(texttemplate='$%{text:.0f}', textposition='outside', textfont=dict(color='#f1f5f9'))
         fig2.update_layout(**PLOTLY_THEME, height=300, showlegend=False)
         st.plotly_chart(fig2, use_container_width=True)
 
@@ -1142,28 +1095,22 @@ elif page == "CLV Analizi":
         fig3.update_layout(legend=dict(orientation='h', y=-0.1, x=0.5, xanchor='center',
                                        bgcolor='rgba(0,0,0,0)', font=dict(color='#f1f5f9')))
         st.plotly_chart(fig3, use_container_width=True)
-
     with col2:
         st.markdown("<div class='section-title'>En Değerli 10 Müşteri</div>", unsafe_allow_html=True)
         top10 = clv.nlargest(10, 'predicted_clv')[
-            ['user_id', 'segment', 'monetary', 'frequency', 'predicted_clv']
-        ].copy()
+            ['user_id', 'segment', 'monetary', 'frequency', 'predicted_clv']].copy()
         top10['predicted_clv'] = top10['predicted_clv'].round(1).astype(str) + '$'
-        top10['monetary'] = top10['monetary'].round(1).astype(str) + '$'
+        top10['monetary']      = top10['monetary'].round(1).astype(str) + '$'
         top10.columns = ['ID', 'Segment', 'Toplam Harcama', 'Sıklık', 'Tahmini CLV']
         st.dataframe(top10, use_container_width=True, hide_index=True)
 
     st.markdown("<div class='section-title'>CLV & Churn Riski Matrisi</div>", unsafe_allow_html=True)
     st.markdown("<p style='color:#94a3b8; font-size:0.85rem; margin-bottom:1rem;'>Sağ üst köşe = yüksek değerli ama riskli müşteriler — Öncelikli aksiyon grubu!</p>", unsafe_allow_html=True)
-
     clv_churn = clv.merge(rfm[['user_id', 'churn_probability']], on='user_id', how='left')
     sample = clv_churn.sample(min(2000, len(clv_churn)), random_state=42)
     fig4 = px.scatter(sample, x='churn_probability', y='predicted_clv',
-                      color='segment', color_discrete_map=SEGMENT_COLORS,
-                      opacity=0.6,
-                      labels={'churn_probability': 'Churn Riski',
-                              'predicted_clv': 'Tahmini CLV ($)',
-                              'segment': 'Segment'})
+                      color='segment', color_discrete_map=SEGMENT_COLORS, opacity=0.6,
+                      labels={'churn_probability':'Churn Riski','predicted_clv':'Tahmini CLV ($)','segment':'Segment'})
     fig4.add_vline(x=0.5, line_dash="dash", line_color="#ef4444",
                    annotation_text="Risk Eşiği", annotation_font_color="#ef4444")
     fig4.update_layout(**PLOTLY_THEME, height=350)
@@ -1205,26 +1152,24 @@ elif page == "Model Performansı":
     def load_model_data():
         with open('data/model_metrics.json', 'r') as f:
             metrics = json.load(f)
-        roc     = pd.read_csv('data/roc_curve.csv')
-        lift    = pd.read_csv('data/lift_curve.csv')
-        pr      = pd.read_csv('data/pr_curve.csv')
-        shap_m  = pd.read_csv('data/shap_mean.csv')
+        roc      = pd.read_csv('data/roc_curve.csv')
+        lift     = pd.read_csv('data/lift_curve.csv')
+        pr       = pd.read_csv('data/pr_curve.csv')
+        shap_m   = pd.read_csv('data/shap_mean.csv')
         feat_imp = pd.read_csv('data/feature_importance.csv')
         return metrics, roc, lift, pr, shap_m, feat_imp
 
     metrics, roc, lift, pr, shap_m, feat_imp = load_model_data()
     cm = metrics['confusion_matrix']
 
-    # ── KPI Kartları ──
     c1, c2, c3, c4, c5 = st.columns(5)
-    kpis = [
+    for col, label, val, color in [
         (c1, "Accuracy",  f"%{metrics['accuracy']*100:.1f}",  "#00d4ff"),
         (c2, "Precision", f"%{metrics['precision']*100:.1f}", "#7c3aed"),
         (c3, "Recall",    f"%{metrics['recall']*100:.1f}",    "#10b981"),
         (c4, "F1 Score",  f"%{metrics['f1']*100:.1f}",        "#f59e0b"),
         (c5, "ROC AUC",   f"{metrics['roc_auc']:.3f}",        "#ef4444"),
-    ]
-    for col, label, val, color in kpis:
+    ]:
         with col:
             st.markdown(f"""<div class='kpi-card'>
                 <div class='kpi-label'>{label}</div>
@@ -1232,133 +1177,82 @@ elif page == "Model Performansı":
             </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── Confusion Matrix + ROC ──
     col1, col2 = st.columns(2)
-
     with col1:
         st.markdown("<div class='section-title'>Confusion Matrix</div>", unsafe_allow_html=True)
-        cm_data = [[cm['tn'], cm['fp']], [cm['fn'], cm['tp']]]
+        cm_data   = [[cm['tn'], cm['fp']], [cm['fn'], cm['tp']]]
         cm_labels = [['TN', 'FP'], ['FN', 'TP']]
-        cm_text = [[f"{cm_labels[i][j]}<br>{cm_data[i][j]:,}" for j in range(2)] for i in range(2)]
+        cm_text   = [[f"{cm_labels[i][j]}<br>{cm_data[i][j]:,}" for j in range(2)] for i in range(2)]
         fig_cm = go.Figure(data=go.Heatmap(
-            z=cm_data,
-            x=['Tahmin: Aktif', 'Tahmin: Churn'],
-            y=['Gerçek: Aktif', 'Gerçek: Churn'],
-            colorscale=[[0, '#1a1a3e'], [0.5, '#7c3aed'], [1, '#10b981']],
-            text=cm_text,
-            texttemplate='%{text}',
-            textfont=dict(color='white', size=14),
-            showscale=False
-        ))
+            z=cm_data, x=['Tahmin: Aktif', 'Tahmin: Churn'], y=['Gerçek: Aktif', 'Gerçek: Churn'],
+            colorscale=[[0,'#1a1a3e'],[0.5,'#7c3aed'],[1,'#10b981']],
+            text=cm_text, texttemplate='%{text}', textfont=dict(color='white', size=14), showscale=False))
         fig_cm.update_layout(**PLOTLY_THEME, height=300)
         st.plotly_chart(fig_cm, use_container_width=True)
-
         mape_val = metrics.get('mape', 0)
         st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
         <strong>MAPE:</strong> %{mape_val:.1f} — Model tahmin olasılıkları gerçek etiketlerden
         ortalama <strong>%{mape_val:.1f}</strong> sapıyor.
         </div>""", unsafe_allow_html=True)
-
     with col2:
         st.markdown("<div class='section-title'>ROC Eğrisi (AUC = {:.3f})</div>".format(metrics['roc_auc']), unsafe_allow_html=True)
         fig_roc = go.Figure()
-        fig_roc.add_trace(go.Scatter(
-            x=roc['fpr'], y=roc['tpr'],
-            mode='lines', name=f"Model (AUC={metrics['roc_auc']:.3f})",
+        fig_roc.add_trace(go.Scatter(x=roc['fpr'], y=roc['tpr'], mode='lines',
+            name=f"Model (AUC={metrics['roc_auc']:.3f})",
             line=dict(color='#00d4ff', width=3),
-            fill='tozeroy', fillcolor='rgba(0,212,255,0.08)'
-        ))
-        fig_roc.add_trace(go.Scatter(
-            x=[0,1], y=[0,1], mode='lines',
-            name='Rastgele Tahmin',
-            line=dict(color='#475569', width=1, dash='dash')
-        ))
+            fill='tozeroy', fillcolor='rgba(0,212,255,0.08)'))
+        fig_roc.add_trace(go.Scatter(x=[0,1], y=[0,1], mode='lines', name='Rastgele Tahmin',
+            line=dict(color='#475569', width=1, dash='dash')))
         fig_roc.update_layout(**PLOTLY_THEME, height=300,
-                              xaxis_title='False Positive Rate',
-                              yaxis_title='True Positive Rate')
+                              xaxis_title='False Positive Rate', yaxis_title='True Positive Rate')
         st.plotly_chart(fig_roc, use_container_width=True)
 
-    # ── Lift + Precision-Recall ──
     col1, col2 = st.columns(2)
-
     with col1:
         st.markdown("<div class='section-title'>Lift Eğrisi</div>", unsafe_allow_html=True)
         fig_lift = go.Figure()
-        fig_lift.add_trace(go.Bar(
-            x=lift['decile_label'].astype(str) + '%',
-            y=lift['lift'],
-            marker_color='#7c3aed',
-            text=lift['lift'].round(2),
-            texttemplate='%{text}x',
-            textposition='outside',
-            textfont=dict(color='#f1f5f9')
-        ))
+        fig_lift.add_trace(go.Bar(x=lift['decile_label'].astype(str)+'%', y=lift['lift'],
+            marker_color='#7c3aed', text=lift['lift'].round(2),
+            texttemplate='%{text}x', textposition='outside', textfont=dict(color='#f1f5f9')))
         fig_lift.add_hline(y=1.0, line_dash='dash', line_color='#475569',
                            annotation_text='Baseline', annotation_font_color='#94a3b8')
         fig_lift.update_layout(**PLOTLY_THEME, height=300,
-                               xaxis_title='Müşteri Yüzdesi (En Riskli → En Az Riskli)',
-                               yaxis_title='Lift')
+                               xaxis_title='Müşteri Yüzdesi (En Riskli → En Az Riskli)', yaxis_title='Lift')
         st.plotly_chart(fig_lift, use_container_width=True)
-
     with col2:
         st.markdown("<div class='section-title'>Precision-Recall Eğrisi</div>", unsafe_allow_html=True)
         fig_pr = go.Figure()
-        fig_pr.add_trace(go.Scatter(
-            x=pr['recall'], y=pr['precision'],
-            mode='lines', line=dict(color='#10b981', width=3),
-            fill='tozeroy', fillcolor='rgba(16,185,129,0.08)'
-        ))
+        fig_pr.add_trace(go.Scatter(x=pr['recall'], y=pr['precision'], mode='lines',
+            line=dict(color='#10b981', width=3),
+            fill='tozeroy', fillcolor='rgba(16,185,129,0.08)'))
         fig_pr.update_layout(**PLOTLY_THEME, height=300,
                              xaxis_title='Recall', yaxis_title='Precision')
         st.plotly_chart(fig_pr, use_container_width=True)
 
-    # ── SHAP + Feature Importance ──
     col1, col2 = st.columns(2)
-
     with col1:
         st.markdown("<div class='section-title'>SHAP — Feature Etki Analizi</div>", unsafe_allow_html=True)
         st.markdown("<p style='color:#94a3b8; font-size:0.83rem; margin-bottom:0.8rem;'>Modelin tahmin yaparken her feature'a ne kadar ağırlık verdiğini gösterir.</p>", unsafe_allow_html=True)
         fig_shap = go.Figure(go.Bar(
-            x=shap_m['shap_value'],
-            y=shap_m['feature'],
-            orientation='h',
-            marker=dict(
-                color=shap_m['shap_value'],
-                colorscale=[[0,'#1a1a3e'],[0.5,'#7c3aed'],[1,'#00d4ff']],
-                showscale=False
-            ),
-            text=shap_m['shap_value'].round(3),
-            textposition='outside',
-            textfont=dict(color='#f1f5f9')
-        ))
+            x=shap_m['shap_value'], y=shap_m['feature'], orientation='h',
+            marker=dict(color=shap_m['shap_value'],
+                        colorscale=[[0,'#1a1a3e'],[0.5,'#7c3aed'],[1,'#00d4ff']], showscale=False),
+            text=shap_m['shap_value'].round(3), textposition='outside', textfont=dict(color='#f1f5f9')))
         fig_shap.update_layout(**PLOTLY_THEME, height=300)
-        fig_shap.update_layout(xaxis_title='Ortalama |SHAP Degeri|',
-                               yaxis=dict(autorange='reversed'))
+        fig_shap.update_layout(xaxis_title='Ortalama |SHAP Degeri|', yaxis=dict(autorange='reversed'))
         st.plotly_chart(fig_shap, use_container_width=True)
-
     with col2:
         st.markdown("<div class='section-title'>Feature Importance</div>", unsafe_allow_html=True)
         fig_fi = go.Figure(go.Bar(
-            x=feat_imp['importance'],
-            y=feat_imp['feature'],
-            orientation='h',
-            marker=dict(
-                color=feat_imp['importance'],
-                colorscale=[[0,'#1a1a3e'],[0.5,'#f59e0b'],[1,'#10b981']],
-                showscale=False
-            ),
-            text=(feat_imp['importance']*100).round(1),
-            texttemplate='%{text}%',
-            textposition='outside',
-            textfont=dict(color='#f1f5f9')
-        ))
+            x=feat_imp['importance'], y=feat_imp['feature'], orientation='h',
+            marker=dict(color=feat_imp['importance'],
+                        colorscale=[[0,'#1a1a3e'],[0.5,'#f59e0b'],[1,'#10b981']], showscale=False),
+            text=(feat_imp['importance']*100).round(1), texttemplate='%{text}%',
+            textposition='outside', textfont=dict(color='#f1f5f9')))
         fig_fi.update_layout(**PLOTLY_THEME, height=300)
-        fig_fi.update_layout(xaxis_title='Onem Skoru',
-                             yaxis=dict(autorange='reversed'))
+        fig_fi.update_layout(xaxis_title='Onem Skoru', yaxis=dict(autorange='reversed'))
         st.plotly_chart(fig_fi, use_container_width=True)
 
-    # ── Insight Kutuları ──
     st.markdown("<div class='section-title'>Önemli Bulgular</div>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
     top_shap = shap_m.iloc[0]
@@ -1376,11 +1270,9 @@ elif page == "Model Performansı":
         Kampanya bütçesi bu gruba odaklanmalı.
         </div>""", unsafe_allow_html=True)
     with c3:
-        fp_cost = cm['fp']
-        fn_cost = cm['fn']
         st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
-        Model <strong>{fp_cost:,}</strong> aktif müşteriyi yanlışlıkla riskli gördü (FP),
-        <strong>{fn_cost:,}</strong> churn müşteriyi kaçırdı (FN).
+        Model <strong>{cm['fp']:,}</strong> aktif müşteriyi yanlışlıkla riskli gördü (FP),
+        <strong>{cm['fn']:,}</strong> churn müşteriyi kaçırdı (FN).
         FN maliyeti genellikle daha yüksektir.
         </div>""", unsafe_allow_html=True)
 
