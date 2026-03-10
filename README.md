@@ -211,5 +211,5 @@ streamlit run dashboard.py
 
 ## 👩‍💻 Geliştirici
 
-**Cansu Yıldırım**  
+**Cansu Yıldırım**          
 [GitHub](https://github.com/cansuyildirimmm)
