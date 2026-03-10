@@ -320,7 +320,8 @@ with st.sidebar:
         "Müşteri Sorgulama",
         "Cohort Analizi",
         "CLV Analizi",
-        "Model Performansı"
+        "Model Performansı",
+        "Gelişmiş Analiz"
     ], label_visibility="collapsed")
 
     st.divider()
@@ -1276,5 +1277,316 @@ elif page == "Model Performansı":
         FN maliyeti genellikle daha yüksektir.
         </div>""", unsafe_allow_html=True)
 
+
+# ══════════════════════════════════════════
+# SAYFA 10: GELİŞMİŞ ANALİZ
+# Aksiyon Penceresi + Mevsimsellik
+# ══════════════════════════════════════════
+elif page == "Gelişmiş Analiz":
+    st.markdown("### Gelişmiş Analiz")
+
+    import json, os
+
+    tab1, tab2 = st.tabs(["🎯 Aksiyon Penceresi", "🌊 Mevsimsellik"])
+
+    # ─────────────────────────────────────
+    # TAB 1: AKSİYON PENCERESİ
+    # ─────────────────────────────────────
+    with tab1:
+        st.markdown("<div style='color:#94a3b8; margin-bottom:1.5rem;'>Model kaç gün önceden churn riskini tespit edebiliyor? Hangi recency eşiğinde aksiyon almalısın?</div>", unsafe_allow_html=True)
+
+        @st.cache_data
+        def load_action_data():
+            aw  = pd.read_csv('data/action_window.csv')
+            rt  = pd.read_csv('data/recency_threshold.csv')
+            src = pd.read_csv('data/segment_recency_churn.csv')
+            return aw, rt, src
+
+        try:
+            aw, rt, src = load_action_data()
+
+            # KPI'lar
+            # Churn'ün %50'yi ilk aştığı recency günü
+            threshold_day = rt[rt['avg_churn_prob'] >= 0.5]['recency_day'].min()
+            early_warn    = rt[rt['avg_churn_prob'] >= 0.3]['recency_day'].min()
+            high_risk_day = rt[rt['avg_churn_prob'] >= 0.7]['recency_day'].min()
+
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.markdown(f"""<div class='kpi-card'>
+                    <div class='kpi-label'>⚡ Erken Uyarı Eşiği</div>
+                    <div class='kpi-value' style='color:#f59e0b;'>{int(early_warn)} gün</div>
+                    <div class='kpi-delta-negative'>Risk %30'u aşıyor</div>
+                </div>""", unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""<div class='kpi-card'>
+                    <div class='kpi-label'>⚠️ Kritik Eşik</div>
+                    <div class='kpi-value' style='color:#ef4444;'>{int(threshold_day)} gün</div>
+                    <div class='kpi-delta-negative'>Risk %50'yi aşıyor</div>
+                </div>""", unsafe_allow_html=True)
+            with c3:
+                st.markdown(f"""<div class='kpi-card'>
+                    <div class='kpi-label'>🔴 Yüksek Risk Eşiği</div>
+                    <div class='kpi-value' style='color:#7c3aed;'>{int(high_risk_day)} gün</div>
+                    <div class='kpi-delta-negative'>Risk %70'i aşıyor</div>
+                </div>""", unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown("<div class='section-title'>📈 Recency → Churn Riski İlişkisi</div>", unsafe_allow_html=True)
+                st.markdown("<p style='color:#94a3b8; font-size:0.83rem; margin-bottom:0.8rem;'>Son alışverişten kaç gün geçtikçe churn riski nasıl değişiyor?</p>", unsafe_allow_html=True)
+
+                # Smoothed line
+                rt_smooth = rt[rt['recency_day'] <= 150].copy()
+                rt_smooth['smooth'] = rt_smooth['avg_churn_prob'].rolling(5, min_periods=1, center=True).mean()
+
+                fig_aw = go.Figure()
+                fig_aw.add_trace(go.Scatter(
+                    x=rt_smooth['recency_day'], y=rt_smooth['smooth'] * 100,
+                    mode='lines', name='Churn Riski (%)',
+                    line=dict(color='#00d4ff', width=3),
+                    fill='tozeroy', fillcolor='rgba(0,212,255,0.08)'
+                ))
+                # Eşik çizgileri
+                fig_aw.add_hline(y=30, line_dash='dot', line_color='#f59e0b',
+                                 annotation_text='%30 Erken Uyarı',
+                                 annotation_font_color='#f59e0b')
+                fig_aw.add_hline(y=50, line_dash='dash', line_color='#ef4444',
+                                 annotation_text='%50 Kritik',
+                                 annotation_font_color='#ef4444')
+                fig_aw.add_hline(y=70, line_dash='dot', line_color='#7c3aed',
+                                 annotation_text='%70 Yüksek Risk',
+                                 annotation_font_color='#a78bfa')
+                fig_aw.update_layout(**PLOTLY_THEME, height=320,
+                                     xaxis_title='Son Alışverişten Geçen Gün (Recency)',
+                                     yaxis_title='Ortalama Churn Riski (%)')
+                st.plotly_chart(fig_aw, use_container_width=True)
+
+            with col2:
+                st.markdown("<div class='section-title'>🪣 Recency Bucket — Risk Dağılımı</div>", unsafe_allow_html=True)
+                st.markdown("<p style='color:#94a3b8; font-size:0.83rem; margin-bottom:0.8rem;'>Hangi recency aralığında kaç müşteri var ve ortalama riski nedir?</p>", unsafe_allow_html=True)
+
+                fig_bucket = go.Figure()
+                bar_colors = ['#10b981' if v < 30 else ('#f59e0b' if v < 50 else '#ef4444')
+                              for v in aw['avg_churn_prob_pct']]
+                fig_bucket.add_trace(go.Bar(
+                    x=aw['recency_bucket'].astype(str),
+                    y=aw['avg_churn_prob_pct'],
+                    marker_color=bar_colors,
+                    text=aw['avg_churn_prob_pct'],
+                    texttemplate='%{text}%',
+                    textposition='outside',
+                    textfont=dict(color='#f1f5f9'),
+                    name='Churn Riski (%)'
+                ))
+                fig_bucket.update_layout(**PLOTLY_THEME, height=320,
+                                         xaxis_title='Recency Aralığı (gün)',
+                                         yaxis_title='Ort. Churn Riski (%)')
+                st.plotly_chart(fig_bucket, use_container_width=True)
+
+            # Segment bazlı aksiyon penceresi
+            st.markdown("<div class='section-title'>🎯 Segment Bazlı Aksiyon Penceresi</div>", unsafe_allow_html=True)
+            fig_seg = go.Figure()
+            seg_colors = [SEGMENT_COLORS.get(s, '#94a3b8') for s in src['segment']]
+            fig_seg.add_trace(go.Bar(
+                x=src['segment'], y=src['avg_recency'],
+                marker_color=seg_colors,
+                text=src['avg_recency'].round(0),
+                texttemplate='%{text} gün',
+                textposition='outside',
+                textfont=dict(color='#f1f5f9'),
+                name='Ort. Recency (gün)'
+            ))
+            fig_seg.add_trace(go.Scatter(
+                x=src['segment'],
+                y=src['avg_churn_prob'] * 100,
+                mode='lines+markers',
+                name='Ort. Churn Riski (%)',
+                line=dict(color='#f59e0b', width=2),
+                marker=dict(size=10, color='#f59e0b'),
+                yaxis='y2'
+            ))
+            fig_seg.update_layout(**PLOTLY_THEME, height=300)
+            fig_seg.update_layout(
+                yaxis=dict(title='Ort. Recency (gün)', gridcolor='#1e2035', tickfont=dict(color='#cbd5e1')),
+                yaxis2=dict(title='Churn Riski (%)', overlaying='y', side='right',
+                            gridcolor='rgba(0,0,0,0)', tickfont=dict(color='#f59e0b')),
+                legend=dict(orientation='h', y=-0.25, x=0.5, xanchor='center',
+                            bgcolor='rgba(0,0,0,0)', font=dict(color='#f1f5f9'))
+            )
+            st.plotly_chart(fig_seg, use_container_width=True)
+
+            # Insight kutuları
+            st.markdown("<div class='section-title'>💡 Önemli Bulgular</div>", unsafe_allow_html=True)
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
+                Model, son alışverişten <strong>{int(early_warn)} gün</strong> sonra
+                erken uyarı verebiliyor. Bu pencerede müdahale en az maliyetli.
+                </div>""", unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
+                Churn riski <strong>~60. günde</strong> ani sıçrama yapıyor — bu modelin
+                churn tanımından kaynaklanıyor (recency &gt; 60). Kampanyayı
+                <strong>45-55. günler</strong> arasında başlatmak ideal:
+                risk henüz düşükken müdahale en az maliyetli.
+                </div>""", unsafe_allow_html=True)
+            with c3:
+                st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
+                <strong>{int(high_risk_day)} günden</strong> sonra risk %70'i aşıyor.
+                Bu noktada müşteri neredeyse kayıp — kampanya maliyeti artar.
+                </div>""", unsafe_allow_html=True)
+
+        except FileNotFoundError:
+            st.warning("⚠️ Veri dosyaları bulunamadı. Lütfen önce `python src/advanced_analysis.py` komutunu çalıştır.")
+
+    # ─────────────────────────────────────
+    # TAB 2: MEVSİMSELLİK
+    # ─────────────────────────────────────
+    with tab2:
+        st.markdown("<div style='color:#94a3b8; margin-bottom:1.5rem;'>Satışlardaki haftalık, aylık ve saatlik mevsimsel pattern'ler.</div>", unsafe_allow_html=True)
+
+        @st.cache_data
+        def load_season_data():
+            hm   = pd.read_csv('data/seasonality_heatmap.csv')
+            ms   = pd.read_csv('data/monthly_seasonality.csv')
+            ts   = pd.read_csv('data/timeslot_revenue.csv')
+            wp   = pd.read_csv('data/weekly_pattern.csv')
+            with open('data/seasonality_summary.json') as f:
+                summary = json.load(f)
+            return hm, ms, ts, wp, summary
+
+        try:
+            hm, ms, ts, wp, summary = load_season_data()
+
+            # KPI'lar
+            c1, c2, c3, c4 = st.columns(4)
+            for col, label, val, color in [
+                (c1, "🏆 Peak Gün",    summary['peak_day'],           "#00d4ff"),
+                (c2, "⏰ Peak Saat",   f"{summary['peak_hour']}:00",  "#7c3aed"),
+                (c3, "📅 Peak Ay",     summary['peak_month'],         "#10b981"),
+                (c4, "📦 Top. Sipariş", f"{summary['total_orders']:,}", "#f59e0b"),
+            ]:
+                with col:
+                    st.markdown(f"""<div class='kpi-card'>
+                        <div class='kpi-label'>{label}</div>
+                        <div class='kpi-value' style='color:{color}; font-size:1.3rem;'>{val}</div>
+                    </div>""", unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # Gün × Saat ısı haritası
+            st.markdown("<div class='section-title'>🌡️ Gün × Saat Gelir Isı Haritası</div>", unsafe_allow_html=True)
+            st.markdown("<p style='color:#94a3b8; font-size:0.83rem; margin-bottom:0.8rem;'>Haftanın hangi günü, hangi saatte en çok satış yapılıyor?</p>", unsafe_allow_html=True)
+
+            day_order = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+            hm['dayofweek'] = pd.Categorical(hm['dayofweek'], categories=day_order, ordered=True)
+            hm_pivot = hm.pivot_table(index='dayofweek', columns='hour', values='revenue', aggfunc='sum')
+            hm_pivot = hm_pivot.reindex(day_order)
+
+            fig_hm = go.Figure(data=go.Heatmap(
+                z=hm_pivot.values,
+                x=[f"{h}:00" for h in hm_pivot.columns],
+                y=['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'],
+                colorscale=[
+                    [0.0, '#0a0a0f'], [0.2, '#1a1a3e'],
+                    [0.5, '#7c3aed'], [0.8, '#00d4ff'], [1.0, '#10b981']
+                ],
+                showscale=True,
+                colorbar=dict(tickfont=dict(color='#f1f5f9'),
+                              title=dict(text='Gelir ($)', font=dict(color='#f1f5f9')))
+            ))
+            fig_hm.update_layout(**PLOTLY_THEME, height=320,
+                                  xaxis_title='Saat', yaxis_title='Gün')
+            st.plotly_chart(fig_hm, use_container_width=True)
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown("<div class='section-title'>📅 Aylık Gelir Trendi</div>", unsafe_allow_html=True)
+                fig_ms = go.Figure()
+                fig_ms.add_trace(go.Bar(
+                    x=ms['month'], y=ms['revenue'],
+                    marker_color='#7c3aed', opacity=0.85,
+                    name='Gelir ($)',
+                    text=ms['revenue'].apply(lambda x: f"${x:,.0f}"),
+                    textposition='outside', textfont=dict(color='#f1f5f9', size=10)
+                ))
+                fig_ms.add_trace(go.Scatter(
+                    x=ms['month'], y=ms['avg_order_value'],
+                    mode='lines+markers', name='Ort. Sipariş ($)',
+                    line=dict(color='#00d4ff', width=2),
+                    marker=dict(size=8), yaxis='y2'
+                ))
+                fig_ms.update_layout(**PLOTLY_THEME, height=300)
+                fig_ms.update_layout(
+                    yaxis=dict(title='Toplam Gelir ($)', gridcolor='#1e2035', tickfont=dict(color='#cbd5e1')),
+                    yaxis2=dict(title='Ort. Sipariş ($)', overlaying='y', side='right',
+                                gridcolor='rgba(0,0,0,0)', tickfont=dict(color='#00d4ff')),
+                    legend=dict(orientation='h', y=-0.3, x=0.5, xanchor='center',
+                                bgcolor='rgba(0,0,0,0)', font=dict(color='#f1f5f9'))
+                )
+                st.plotly_chart(fig_ms, use_container_width=True)
+
+            with col2:
+                st.markdown("<div class='section-title'>⏰ Gün İçi Zaman Dilimi Analizi</div>", unsafe_allow_html=True)
+                ts_agg = ts.groupby('time_slot')['revenue'].sum().reset_index()
+                ts_agg = ts_agg.sort_values('revenue', ascending=False)
+                slot_colors = {'Akşam (18-24)':'#7c3aed','Öğle (12-18)':'#00d4ff',
+                               'Sabah (06-12)':'#10b981','Gece (00-06)':'#475569'}
+                fig_ts = px.pie(ts_agg, values='revenue', names='time_slot',
+                                color='time_slot',
+                                color_discrete_map=slot_colors, hole=0.55)
+                fig_ts.update_traces(textfont_size=12, textfont_color='white',
+                                     marker=dict(line=dict(color='#0a0a0f', width=2)))
+                fig_ts.update_layout(**PLOTLY_THEME, height=300)
+                fig_ts.update_layout(legend=dict(orientation='h', y=-0.15, x=0.5, xanchor='center',
+                                                  bgcolor='rgba(0,0,0,0)', font=dict(color='#f1f5f9')))
+                st.plotly_chart(fig_ts, use_container_width=True)
+
+            # Ayın haftası pattern
+            st.markdown("<div class='section-title'>📆 Ayın Haftası — Gelir Dağılımı</div>", unsafe_allow_html=True)
+            st.markdown("<p style='color:#94a3b8; font-size:0.83rem; margin-bottom:0.8rem;'>Ayın 1. haftası mı daha yoğun, yoksa son haftası mı?</p>", unsafe_allow_html=True)
+            wp_agg = wp.groupby('weekofmonth')['revenue'].mean().reset_index()
+            wp_agg['week_label'] = wp_agg['weekofmonth'].apply(lambda x: f"{x}. Hafta")
+            fig_wp = px.bar(wp_agg, x='week_label', y='revenue',
+                            color='revenue',
+                            color_continuous_scale=['#1a1a3e','#7c3aed','#00d4ff','#10b981'],
+                            labels={'revenue':'Ort. Gelir ($)', 'week_label':''},
+                            text='revenue')
+            fig_wp.update_traces(texttemplate='$%{text:,.0f}', textposition='outside',
+                                  textfont=dict(color='#f1f5f9'))
+            fig_wp.update_layout(**PLOTLY_THEME, height=280, coloraxis_showscale=False)
+            st.plotly_chart(fig_wp, use_container_width=True)
+
+            # Insight kutuları
+            st.markdown("<div class='section-title'>💡 Önemli Bulgular</div>", unsafe_allow_html=True)
+            top_slot = ts_agg.iloc[0]['time_slot']
+            top_slot_pct = ts_agg.iloc[0]['revenue'] / ts_agg['revenue'].sum() * 100
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
+                En yoğun zaman dilimi <strong>{top_slot}</strong> —
+                toplam gelirin <strong>%{top_slot_pct:.0f}'ini</strong> oluşturuyor.
+                Kampanyaları bu saatlere zamanla.
+                </div>""", unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
+                Peak gün <strong>{summary['peak_day']}</strong>, peak saat
+                <strong>{summary['peak_hour']}:00</strong>. İndirim bildirimleri
+                bu pencerede gönderilmeli.
+                </div>""", unsafe_allow_html=True)
+            with c3:
+                best_week = wp_agg.loc[wp_agg['revenue'].idxmax(), 'week_label']
+                st.markdown(f"""<div class='insight-box' style='color:#f1f5f9;'>
+                Ayın <strong>{best_week}</strong> diğer haftalara göre
+                daha yüksek gelir üretiyor. Büyük kampanyaları bu haftaya planla.
+                </div>""", unsafe_allow_html=True)
+
+        except FileNotFoundError:
+            st.warning("⚠️ Veri dosyaları bulunamadı. Lütfen önce `python src/advanced_analysis.py` komutunu çalıştır.")
 
 
